@@ -1,0 +1,463 @@
+{% extends "base.html" %}
+
+{% block title %}{{ site.name }} - Rakip İstihbarat{% endblock %}
+{% block page_title %}{{ site.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+            <a href="/sites" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <h2 class="text-xl font-semibold text-gray-800">{{ site.name }}</h2>
+                    <span class="px-2 py-1 text-xs font-medium rounded
+                                 {% if site.is_competitor %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
+                        {% if site.is_competitor %}Rakip{% else %}Bizim{% endif %}
+                    </span>
+                    {% if is_scanning %}
+                    <span class="flex items-center space-x-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded">
+                        <span class="w-2 h-2 bg-green-500 rounded-full pulse-dot"></span>
+                        <span>Taranıyor</span>
+                    </span>
+                    {% endif %}
+                </div>
+                <a href="https://{{ site.domain }}" target="_blank" class="text-sm text-indigo-600 hover:underline">
+                    {{ site.domain }} ↗
+                </a>
+            </div>
+        </div>
+        
+        <div class="flex items-center space-x-2">
+            {% if is_scanning %}
+            <button onclick="stopScan()" class="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors">
+                Taramayı Durdur
+            </button>
+            {% else %}
+            <button onclick="startScan()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                Tara
+            </button>
+            {% endif %}
+            <a href="/sites/{{ site.id }}/edit" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                Düzenle
+            </a>
+        </div>
+    </div>
+    
+    <!-- Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+            <p class="text-sm text-gray-500">Toplam Sayfa</p>
+            <p class="text-2xl font-bold text-gray-800">{{ pages|length }}</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+            <p class="text-sm text-gray-500">Sitemap</p>
+            <p class="text-sm font-medium text-gray-800 truncate">
+                {% if site.sitemap_url %}
+                <a href="{{ site.sitemap_url }}" target="_blank" class="text-indigo-600 hover:underline">Mevcut ↗</a>
+                {% else %}
+                <span class="text-gray-400">Belirtilmemiş</span>
+                {% endif %}
+            </p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+            <p class="text-sm text-gray-500">Son Tarama</p>
+            <p class="text-sm font-medium text-gray-800">
+                {% if site.last_scan_at %}
+                {{ site.last_scan_at.strftime('%d.%m.%Y %H:%M') }}
+                {% else %}
+                <span class="text-gray-400">Henüz taranmadı</span>
+                {% endif %}
+            </p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+            <p class="text-sm text-gray-500">Eklenme Tarihi</p>
+            <p class="text-sm font-medium text-gray-800">{{ site.created_at.strftime('%d.%m.%Y') }}</p>
+        </div>
+    </div>
+    
+    <!-- Tabs -->
+    <div x-data="{ activeTab: '{{ request.query_params.get('activeTab', 'pages') }}' }" class="bg-white rounded-xl shadow-sm border border-gray-100">
+        <!-- Tab Headers -->
+        <div class="border-b border-gray-100">
+            <nav class="flex space-x-4 px-6">
+                <button @click="activeTab = 'pages'" 
+                        :class="activeTab === 'pages' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                        class="py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                    Sayfalar ({{ pages|length }})
+                </button>
+                <button @click="activeTab = 'logs'" 
+                        :class="activeTab === 'logs' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                        class="py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                    Değişiklikler ({{ logs|length }})
+                </button>
+                <button @click="activeTab = 'history'" 
+                        :class="activeTab === 'history' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                        class="py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                    Tarama Geçmişi
+                </button>
+                {% if not site.is_competitor %}
+                <button @click="activeTab = 'wordpress'" 
+                        :class="activeTab === 'wordpress' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                        class="py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                    WordPress Bağlantısı
+                    {% if site.wp_api_url and site.wp_api_username %}
+                    <span class="ml-1 text-green-500">✓</span>
+                    {% endif %}
+                </button>
+                {% endif %}
+            </nav>
+        </div>
+        
+        <!-- Pages Tab -->
+        <div x-show="activeTab === 'pages'" class="p-6">
+            {% if pages %}
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th class="pb-3">Sayfa</th>
+                            <th class="pb-3">Kelime</th>
+                            <th class="pb-3">Son Kontrol</th>
+                            <th class="pb-3">Son Değişiklik</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        {% for page in pages[:50] %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="py-3">
+                                <p class="text-sm font-medium text-gray-800">{{ page.title or 'Başlıksız' }}</p>
+                                <a href="{{ page.url }}" target="_blank" class="text-xs text-indigo-600 hover:underline truncate block max-w-md">
+                                    {{ page.url }}
+                                </a>
+                            </td>
+                            <td class="py-3 text-sm text-gray-600">{{ page.word_count }}</td>
+                            <td class="py-3 text-sm text-gray-600">
+                                {{ page.last_checked_at.strftime('%d.%m %H:%M') if page.last_checked_at else '-' }}
+                            </td>
+                            <td class="py-3 text-sm text-gray-600">
+                                {{ page.last_changed_at.strftime('%d.%m %H:%M') if page.last_changed_at else '-' }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if pages|length > 50 %}
+            <p class="text-sm text-gray-500 mt-4">İlk 50 sayfa gösteriliyor. Toplam: {{ pages|length }}</p>
+            {% endif %}
+            {% else %}
+            <p class="text-center text-gray-500 py-8">Henüz sayfa bulunamadı. Tarama başlatın.</p>
+            {% endif %}
+        </div>
+        
+        <!-- Logs Tab -->
+        <div x-show="activeTab === 'logs'" class="divide-y divide-gray-100">
+            {% if logs %}
+            {% for log in logs %}
+            <div class="p-4 hover:bg-gray-50 cursor-pointer" onclick="window.location='/logs/{{ log.id }}'">
+                <div class="flex items-center space-x-3">
+                    {% if log.action_type.value == 'NEW' %}
+                    <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded">YENİ</span>
+                    {% else %}
+                    <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded">GÜNCELLEME</span>
+                    {% endif %}
+                    <span class="text-sm text-gray-800">{{ log.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+                    {% if log.change_percentage > 0 %}
+                    <span class="text-xs text-gray-500">%{{ "%.1f"|format(log.change_percentage) }} değişim</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="text-center text-gray-500 py-8">Henüz değişiklik kaydı yok.</p>
+            {% endif %}
+        </div>
+        
+        <!-- History Tab -->
+        <div x-show="activeTab === 'history'" class="p-6">
+            {% if scan_history %}
+            <div class="space-y-3">
+                {% for scan in scan_history %}
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div class="flex items-center space-x-3">
+                        {% if scan.status.value == 'COMPLETED' %}
+                        <span class="w-3 h-3 bg-green-500 rounded-full"></span>
+                        {% elif scan.status.value == 'RUNNING' %}
+                        <span class="w-3 h-3 bg-blue-500 rounded-full pulse-dot"></span>
+                        {% elif scan.status.value == 'FAILED' %}
+                        <span class="w-3 h-3 bg-red-500 rounded-full"></span>
+                        {% else %}
+                        <span class="w-3 h-3 bg-gray-400 rounded-full"></span>
+                        {% endif %}
+                        <div>
+                            <p class="text-sm font-medium text-gray-800">{{ scan.status.value }}</p>
+                            <p class="text-xs text-gray-500">{{ scan.created_at.strftime('%d.%m.%Y %H:%M') }}</p>
+                        </div>
+                    </div>
+                    <div class="text-right text-sm">
+                        <p class="text-gray-800">{{ scan.scanned_pages }}/{{ scan.total_pages }} sayfa</p>
+                        <p class="text-xs text-gray-500">
+                            {{ scan.new_pages_found }} yeni, {{ scan.updated_pages_found }} güncelleme
+                        </p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-center text-gray-500 py-8">Henüz tarama geçmişi yok.</p>
+            {% endif %}
+        </div>
+        
+        <!-- WordPress Connection Tab -->
+        {% if not site.is_competitor %}
+        <div x-show="activeTab === 'wordpress'" class="p-6">
+            <div class="max-w-2xl">
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">WordPress REST API Bağlantısı</h3>
+                    <p class="text-sm text-gray-600">
+                        WordPress Application Password kullanarak REST API üzerinden bağlanın. 
+                        Bu sayede Elementor içeriklerini güncelleyebilirsiniz.
+                    </p>
+                </div>
+                
+                <!-- Mevcut Bağlantı Durumu -->
+                {% if site.wp_api_url and site.wp_api_username %}
+                <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span class="font-semibold text-green-800">Bağlantı Aktif</span>
+                    </div>
+                    <div class="text-sm text-green-700 space-y-1">
+                        <p><strong>WordPress URL:</strong> {{ site.wp_api_url }}</p>
+                        <p><strong>Kullanıcı Adı:</strong> {{ site.wp_api_username }}</p>
+                        <p class="text-xs text-green-600 mt-2">
+                            ✓ Application Password kayıtlı (güvenli)
+                        </p>
+                    </div>
+                </div>
+                {% else %}
+                <div class="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        <span class="font-semibold text-yellow-800">Bağlantı Yapılandırılmamış</span>
+                    </div>
+                    <p class="text-sm text-yellow-700">
+                        WordPress REST API bağlantı bilgilerini girin.
+                    </p>
+                </div>
+                {% endif %}
+                
+                <!-- WordPress Bağlantı Formu -->
+                <form method="POST" action="/sites/{{ site.id }}/wordpress-connection" class="space-y-6">
+                    <div>
+                        <label for="wp_api_url" class="block text-sm font-medium text-gray-700 mb-2">
+                            WordPress Site URL <span class="text-red-500">*</span>
+                        </label>
+                        <input type="url" 
+                               id="wp_api_url" 
+                               name="wp_api_url" 
+                               value="{{ site.wp_api_url or '' }}"
+                               placeholder="https://example.com"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                               required>
+                        <p class="mt-1 text-xs text-gray-500">
+                            WordPress sitenizin tam URL'i (https:// ile başlamalı)
+                        </p>
+                    </div>
+                    
+                    <div>
+                        <label for="wp_api_username" class="block text-sm font-medium text-gray-700 mb-2">
+                            WordPress Kullanıcı Adı <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" 
+                               id="wp_api_username" 
+                               name="wp_api_username" 
+                               value="{{ site.wp_api_username or '' }}"
+                               placeholder="admin"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                               required>
+                        <p class="mt-1 text-xs text-gray-500">
+                            WordPress kullanıcı adınız (Application Password oluşturduğunuz kullanıcı)
+                        </p>
+                    </div>
+                    
+                    <div>
+                        <label for="wp_api_password" class="block text-sm font-medium text-gray-700 mb-2">
+                            Application Password <span class="text-red-500">*</span>
+                        </label>
+                        <input type="password" 
+                               id="wp_api_password" 
+                               name="wp_api_password" 
+                               placeholder="•••• •••• •••• •••• •••• ••••"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                               {% if site.wp_api_password %}value="••••••••"{% endif %}>
+                        <p class="mt-1 text-xs text-gray-500">
+                            WordPress Application Password (24 karakterlik kod). 
+                            <a href="https://wordpress.org/documentation/article/application-passwords/" target="_blank" class="text-indigo-600 hover:underline">
+                                Nasıl oluşturulur? ↗
+                            </a>
+                        </p>
+                        {% if site.wp_api_password %}
+                        <p class="mt-1 text-xs text-yellow-600">
+                            ⚠️ Mevcut şifre korunacak. Değiştirmek için yeni şifre girin.
+                        </p>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="flex items-center space-x-4">
+                        <button type="submit" 
+                                class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium">
+                            Bağlantıyı Kaydet
+                        </button>
+                        {% if site.wp_api_url and site.wp_api_username %}
+                        <button type="button" 
+                                onclick="testConnection()"
+                                class="px-6 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium">
+                            Bağlantıyı Test Et
+                        </button>
+                        {% endif %}
+                    </div>
+                </form>
+                
+                <!-- Bilgilendirme -->
+                <div class="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 class="font-semibold text-blue-900 mb-2">📋 Application Password Nasıl Oluşturulur?</h4>
+                    <ol class="text-sm text-blue-800 space-y-2 list-decimal list-inside">
+                        <li>WordPress admin paneline giriş yapın</li>
+                        <li>Kullanıcılar → Profil sayfasına gidin</li>
+                        <li>"Application Passwords" bölümünü bulun</li>
+                        <li>Yeni bir Application Password oluşturun (örn: "Rakip İstihbarat")</li>
+                        <li>Oluşturulan 24 karakterlik kodu kopyalayın</li>
+                        <li>Bu formu doldurup kaydedin</li>
+                    </ol>
+                    <p class="text-xs text-blue-700 mt-3">
+                        <strong>Not:</strong> Application Password sadece bir kez gösterilir. Kaybetmemeniz önemlidir!
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    async function startScan() {
+        try {
+            const response = await fetch('/sites/{{ site.id }}/scan', { method: 'POST' });
+            const data = await response.json();
+            
+            if (data.status === 'started') {
+                showToast('Tarama başlatıldı!', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('Bu site zaten taranıyor.', 'warning');
+            }
+        } catch (error) {
+            showToast('Hata: ' + error.message, 'error');
+        }
+    }
+    
+    async function stopScan() {
+        try {
+            const response = await fetch('/sites/{{ site.id }}/stop-scan', { method: 'POST' });
+            showToast('Tarama durduruluyor...', 'info');
+            setTimeout(() => location.reload(), 1000);
+        } catch (error) {
+            showToast('Hata: ' + error.message, 'error');
+        }
+    }
+    
+    async function testConnection() {
+        const wpUrl = document.getElementById('wp_api_url').value;
+        const wpUsername = document.getElementById('wp_api_username').value;
+        const wpPassword = document.getElementById('wp_api_password').value;
+        
+        if (!wpUrl || !wpUsername || !wpPassword) {
+            alert('Lütfen tüm alanları doldurun');
+            return;
+        }
+        
+        try {
+            console.log('Testing WordPress connection...');
+            console.log('Endpoint: /sites/api/test-wordpress-connection');
+            
+            const response = await fetch('/sites/wordpress/test-connection', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    wp_url: wpUrl,
+                    wp_username: wpUsername,
+                    wp_password: wpPassword
+                })
+            });
+            
+            console.log('Response status:', response.status);
+            console.log('Response ok:', response.ok);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Response error:', errorText);
+                throw new Error(`HTTP ${response.status}: ${response.statusText}\n${errorText}`);
+            }
+            
+            const data = await response.json();
+            console.log('Response data:', data);
+            
+            if (data.success) {
+                alert('✅ WordPress REST API bağlantısı başarılı!\n\n' + data.message);
+            } else {
+                alert('❌ Bağlantı hatası:\n\n' + data.message);
+            }
+        } catch (error) {
+            console.error('Test connection error:', error);
+            alert('❌ Hata: ' + error.message + '\n\nEndpoint: /sites/wordpress/test-connection\n\nConsole\'u kontrol edin (F12)');
+        }
+    }
+    
+    // URL parametrelerinden test sonucunu göster
+    window.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const wpTest = urlParams.get('wp_test');
+        if (wpTest === 'success') {
+            alert('✅ WordPress bağlantısı başarılı!');
+        } else if (wpTest === 'error') {
+            alert('❌ WordPress bağlantı testi başarısız');
+        } else if (wpTest === 'saved') {
+            alert('✅ WordPress bağlantı bilgileri kaydedildi');
+        }
+        
+        // Active tab'ı URL'den al
+        const activeTab = urlParams.get('activeTab');
+        if (activeTab) {
+            // Alpine.js ile tab'ı değiştir
+            setTimeout(() => {
+                // Alpine.js data'yı bul
+                const alpineData = document.querySelector('[x-data]');
+                if (alpineData && alpineData.__x) {
+                    alpineData.__x.$data.activeTab = activeTab;
+                } else {
+                    // Fallback: Button'a tıkla
+                    const tabButton = document.querySelector(`button[onclick*="activeTab = '${activeTab}'"]`);
+                    if (tabButton) {
+                        tabButton.click();
+                    }
+                }
+            }, 100);
+        }
+    });
+</script>
+{% endblock %}

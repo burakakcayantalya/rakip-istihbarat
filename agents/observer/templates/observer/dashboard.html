@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+
+{% block title %}Observer Agent - Dashboard{% endblock %}
+
+{% block page_title %}Observer Agent - Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Progress Bar (Aktif Görev Varsa) -->
+    {% if active_task %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900">{{ active_task.description }}</h3>
+                <p class="text-sm text-gray-500 mt-1">{{ active_task.current_item or "İşlem başlatılıyor..." }}</p>
+            </div>
+            <span class="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                {{ active_task.status.value }}
+            </span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-4">
+            <div class="bg-indigo-600 h-4 rounded-full transition-all duration-300" 
+                 style="width: {{ active_task.progress_percentage }}%">
+            </div>
+        </div>
+        <div class="flex items-center justify-between mt-2 text-sm text-gray-600">
+            <span>{{ active_task.processed_items }} / {{ active_task.total_items }} işlendi</span>
+            <span>{{ active_task.progress_percentage }}%</span>
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-center py-8">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <p class="mt-4 text-gray-500">Şu anda aktif görev yok</p>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- 3 Kutu: Sıradaki / Tamamlanan / Raporlanan -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Sıradaki Görevler -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Sıradaki Görevler</h3>
+                <svg class="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-yellow-600">{{ pending_tasks }}</div>
+            <p class="text-sm text-gray-500 mt-2">Bekleyen görev sayısı</p>
+        </div>
+        
+        <!-- Tamamlanan Görevler -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Tamamlanan Görevler</h3>
+                <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-green-600">{{ completed_tasks }}</div>
+            <p class="text-sm text-gray-500 mt-2">Tamamlanan görev sayısı</p>
+        </div>
+        
+        <!-- Raporlanan Sorunlar -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Raporlanan Sorunlar</h3>
+                <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-red-600">{{ reported_issues }}</div>
+            <p class="text-sm text-gray-500 mt-2">Toplam rapor sayısı</p>
+        </div>
+    </div>
+    
+    <!-- Görevleri Temizle Butonu -->
+    <div class="bg-red-50 border border-red-200 rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h3 class="text-lg font-semibold text-red-900 mb-2">⚠️ Tüm Görevleri Temizle</h3>
+                <p class="text-sm text-red-700">Bu işlem tüm agent'lardaki (Observer, Reviewer, Dispatcher, Link Fixer) görevleri kalıcı olarak silecektir.</p>
+            </div>
+            <button onclick="clearAllTasks()" 
+                    class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold">
+                🗑️ Tüm Görevleri Temizle
+            </button>
+        </div>
+    </div>
+    
+    <!-- Site Seçimi ve Yeni Görev -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Yeni Görev Oluştur</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Site Seç</label>
+                <select id="siteSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                    <option value="">Site seçin...</option>
+                    {% for site in my_sites %}
+                    <option value="{{ site.id }}">{{ site.name }} ({{ site.domain }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Görev Tipi</label>
+                <select id="taskTypeSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                    <option value="FRESHNESS_CHECK">Freshness Kontrolü</option>
+                    <option value="FULL_AUDIT">Tam Denetim</option>
+                    <option value="LINK_AUDIT">Link Denetimi</option>
+                    <option value="SCHEMA_CHECK">Schema Kontrolü</option>
+                    <option value="H1_CHECK">H1 Kontrolü</option>
+                    <option value="DUPLICATE_LINK_CHECK">Duplicate Link Kontrolü</option>
+                </select>
+            </div>
+        </div>
+        <button onclick="createTask()" 
+                class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+            Görev Oluştur
+        </button>
+    </div>
+    
+    <!-- Tabs: Son Görevler / Controller Doğrulamaları -->
+    <div class="bg-white rounded-lg shadow">
+        <!-- Tab Headers -->
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex">
+                <button onclick="switchTab('recent')"
+                        id="tab-recent"
+                        class="tab-button active w-1/2 py-4 px-6 text-center border-b-2 font-medium text-sm">
+                    Son Görevler
+                </button>
+                <button onclick="switchTab('verifications')"
+                        id="tab-verifications"
+                        class="tab-button w-1/2 py-4 px-6 text-center border-b-2 font-medium text-sm">
+                    Controller Doğrulamaları
+                </button>
+            </nav>
+        </div>
+
+        <!-- Tab Content: Son Görevler -->
+        <div id="content-recent" class="tab-content p-6">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Site</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Görev Tipi</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Durum</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İlerleme</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Raporlar</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tarih</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for task in recent_tasks %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ task.site.name }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ task.task_type.value }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full
+                                    {% if task.status.value == 'COMPLETED' %}bg-green-100 text-green-800
+                                    {% elif task.status.value == 'RUNNING' %}bg-blue-100 text-blue-800
+                                    {% elif task.status.value == 'FAILED' %}bg-red-100 text-red-800
+                                    {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                    {{ task.status.value }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-indigo-600 h-2 rounded-full" style="width: {{ task.progress_percentage }}%"></div>
+                                </div>
+                                <span class="text-xs">{{ task.progress_percentage }}%</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ task.reports_count }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ task.created_at.strftime('%d.%m.%Y %H:%M') if task.created_at else '-' }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab Content: Controller Doğrulamaları -->
+        <div id="content-verifications" class="tab-content p-6 hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sayfa URL</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Görev Tipi</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Observer Durum</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Controller Sonuç</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tarih</th>
+                        </tr>
+                    </thead>
+                    <tbody id="verification-table-body" class="bg-white divide-y divide-gray-200">
+                        <tr>
+                            <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">Yükleniyor...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Tab switching
+function switchTab(tabName) {
+    // Hide all tab contents
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.add('hidden');
+    });
+
+    // Remove active class from all buttons
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.classList.remove('active', 'border-indigo-500', 'text-indigo-600');
+        button.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+    });
+
+    // Show selected tab content
+    document.getElementById('content-' + tabName).classList.remove('hidden');
+
+    // Add active class to selected button
+    const activeButton = document.getElementById('tab-' + tabName);
+    activeButton.classList.add('active', 'border-indigo-500', 'text-indigo-600');
+    activeButton.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+
+    // Load verifications if switching to that tab
+    if (tabName === 'verifications') {
+        loadControllerVerifications();
+    }
+}
+
+// Load Controller Verifications
+async function loadControllerVerifications() {
+    try {
+        const response = await fetch('/agents/observer/api/controller-verifications?limit=50');
+        const data = await response.json();
+
+        const tbody = document.getElementById('verification-table-body');
+
+        if (data.status === 'success' && data.verifications.length > 0) {
+            tbody.innerHTML = data.verifications.map(v => `
+                <tr>
+                    <td class="px-6 py-4 text-sm text-gray-900">
+                        <a href="${v.page_url}" target="_blank" class="text-indigo-600 hover:underline">
+                            ${v.page_url.substring(0, 60)}${v.page_url.length > 60 ? '...' : ''}
+                        </a>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${v.task_type}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full ${
+                            v.observer_status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                            v.observer_status === 'RUNNING' ? 'bg-blue-100 text-blue-800' :
+                            'bg-yellow-100 text-yellow-800'
+                        }">
+                            ${v.observer_status}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full ${
+                            v.controller_status === 'VERIFIED_SUCCESS' ? 'bg-green-100 text-green-800' :
+                            v.controller_status === 'VERIFIED_FAILED' ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                        }">
+                            ${v.controller_status || 'PENDING'}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${v.created_at ? new Date(v.created_at).toLocaleString('tr-TR') : '-'}
+                    </td>
+                </tr>
+            `).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">Controller doğrulaması bulunamadı</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error loading verifications:', error);
+        document.getElementById('verification-table-body').innerHTML =
+            '<tr><td colspan="5" class="px-6 py-4 text-center text-sm text-red-500">Yükleme hatası: ' + error.message + '</td></tr>';
+    }
+}
+
+function createTask() {
+    const siteId = document.getElementById('siteSelect').value;
+    const taskType = document.getElementById('taskTypeSelect').value;
+
+    if (!siteId) {
+        alert('Lütfen bir site seçin');
+        return;
+    }
+
+    fetch('/agents/observer/api/tasks/create', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            site_id: parseInt(siteId),
+            task_type: taskType
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('Görev oluşturuldu!');
+            window.location.reload();
+        } else {
+            alert('Hata: ' + (data.message || 'Bilinmeyen hata'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Bir hata oluştu');
+    });
+}
+
+function clearAllTasks() {
+    if (!confirm('⚠️ UYARI: Bu işlem tüm agent\'lardaki görevleri kalıcı olarak silecektir!\n\n- Observer görevleri\n- Reviewer kuyruğu\n- Dispatcher görevleri\n- Link Fixer görevleri\n\nDevam etmek istediğinize emin misiniz?')) {
+        return;
+    }
+    
+    if (!confirm('Son bir kez onaylıyor musunuz? Bu işlem geri alınamaz!')) {
+        return;
+    }
+    
+    // Butonu devre dışı bırak
+    const button = event.target;
+    button.disabled = true;
+    button.textContent = '⏳ Temizleniyor...';
+    
+    fetch('/agents/observer/api/clear-all-tasks', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            const message = `✅ Tüm görevler temizlendi!\n\n` +
+                          `Silinen görevler:\n` +
+                          `- Observer Tasks: ${data.deleted_counts.observer_tasks || 0}\n` +
+                          `- Observer Reports: ${data.deleted_counts.observer_reports || 0}\n` +
+                          `- Reviewer Queue: ${data.deleted_counts.reviewer_queue || 0}\n` +
+                          `- Dispatcher Tasks: ${data.deleted_counts.dispatcher_tasks || 0}\n` +
+                          `- Link Fixer Tasks: ${data.deleted_counts.link_fix_tasks || 0}\n\n` +
+                          `Toplam: ${data.total_deleted} görev silindi.`;
+            alert(message);
+            window.location.reload();
+        } else {
+            alert('Hata: ' + (data.message || 'Bilinmeyen hata'));
+            button.disabled = false;
+            button.textContent = '🗑️ Tüm Görevleri Temizle';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Bir hata oluştu: ' + error.message);
+        button.disabled = false;
+        button.textContent = '🗑️ Tüm Görevleri Temizle';
+    });
+}
+
+// Her 5 saniyede bir aktif görevi kontrol et
+{% if active_task %}
+setInterval(() => {
+    fetch('/agents/observer/api/tasks?status=RUNNING')
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success' && data.tasks.length > 0) {
+                const task = data.tasks[0];
+                // Progress bar'ı güncelle
+                const progressBar = document.querySelector('.bg-indigo-600');
+                if (progressBar) {
+                    progressBar.style.width = task.progress_percentage + '%';
+                }
+                // Sayfayı yenile (basit yaklaşım)
+                // window.location.reload();
+            }
+        });
+}, 5000);
+{% endif %}
+</script>
+{% endblock %}
+
+

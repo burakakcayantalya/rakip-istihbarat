@@ -1,0 +1,468 @@
+{% extends "base.html" %}
+
+{% block title %}Controller Agent - Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3">🎯 Controller Agent - Quality Assurance</h2>
+            <p class="text-muted">Tamamlanan görevleri doğrular ve başarısız olanları tekrar atar</p>
+        </div>
+    </div>
+
+    <!-- İstatistik Kartları -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Bekleyen</h6>
+                    <h3>{{ total_pending }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Doğrulanıyor</h6>
+                    <h3>{{ total_verifying }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h6 class="card-title">✅ Başarılı</h6>
+                    <h3>{{ total_verified_success }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h6 class="card-title">❌ Başarısız</h6>
+                    <h3>{{ total_verified_failed }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-secondary text-white">
+                <div class="card-body">
+                    <h6 class="card-title">🔄 Tekrar Atanan</h6>
+                    <h3>{{ total_retry_assigned }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            {% if today_stats %}
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Bugün Başarı</h6>
+                    <h3>{{ today_stats.success_rate }}%</h3>
+                </div>
+            </div>
+            {% else %}
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h6 class="card-title">Bugün Başarı</h6>
+                    <h3>-</h3>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Bugünkü Detaylı İstatistikler -->
+    {% if today_stats %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>📊 Bugünkü İstatistikler</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <p><strong>Toplam Doğrulama:</strong> {{ today_stats.total_verifications }}</p>
+                            <p><strong>Başarılı:</strong> <span class="text-success">{{ today_stats.verified_success }}</span></p>
+                            <p><strong>Başarısız:</strong> <span class="text-danger">{{ today_stats.verified_failed }}</span></p>
+                            <p><strong>Tekrar Atanan:</strong> {{ today_stats.retry_assigned }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h6>Link Fixer</h6>
+                            <p><strong>Başarılı:</strong> <span class="text-success">{{ today_stats.fixer_success }}</span></p>
+                            <p><strong>Başarısız:</strong> <span class="text-danger">{{ today_stats.fixer_failed }}</span></p>
+                        </div>
+                        <div class="col-md-3">
+                            <h6>AI Helper</h6>
+                            <p><strong>Başarılı:</strong> <span class="text-success">{{ today_stats.ai_helper_success }}</span></p>
+                            <p><strong>Başarısız:</strong> <span class="text-danger">{{ today_stats.ai_helper_failed }}</span></p>
+                        </div>
+                        <div class="col-md-3">
+                            <h6>Başarı Oranı</h6>
+                            <div class="progress" style="height: 30px;">
+                                <div class="progress-bar bg-success" role="progressbar"
+                                     style="width: {{ today_stats.success_rate }}%"
+                                     aria-valuenow="{{ today_stats.success_rate }}"
+                                     aria-valuemin="0" aria-valuemax="100">
+                                    {{ today_stats.success_rate }}%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Bekleyen Görevler -->
+    {% if pending_tasks %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5>⏳ Bekleyen Görevler ({{ total_pending }})</h5>
+                    <button class="btn btn-sm btn-primary" onclick="autoVerifyPending()">
+                        🚀 Otomatik Doğrula
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Agent</th>
+                                    <th>Sayfa URL</th>
+                                    <th>Görev Tipi</th>
+                                    <th>Oluşturulma</th>
+                                    <th>İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for task in pending_tasks %}
+                                <tr>
+                                    <td>#{{ task.id }}</td>
+                                    <td><span class="badge bg-info">{{ task.source_agent }}</span></td>
+                                    <td>
+                                        <small>
+                                            <a href="{{ task.page_url }}" target="_blank">
+                                                {{ task.page_url[:60] }}...
+                                            </a>
+                                        </small>
+                                    </td>
+                                    <td><code>{{ task.task_type }}</code></td>
+                                    <td><small>{{ task.created_at.strftime('%Y-%m-%d %H:%M') if task.created_at else '-' }}</small></td>
+                                    <td>
+                                        <button class="btn btn-xs btn-success" onclick="verifyTask({{ task.id }})">
+                                            ✓ Doğrula
+                                        </button>
+                                        <button class="btn btn-xs btn-info" onclick="viewHistory({{ task.id }})">
+                                            📋 Geçmiş
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Doğrulanıyor -->
+    {% if verifying_tasks %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5>🔍 Doğrulanıyor ({{ total_verifying }})</h5>
+                    <button class="btn btn-sm btn-info" onclick="checkVerifications()">
+                        🔄 Sonuçları Kontrol Et
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Agent</th>
+                                    <th>Sayfa URL</th>
+                                    <th>Observer Task</th>
+                                    <th>Başlangıç</th>
+                                    <th>İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for task in verifying_tasks %}
+                                <tr>
+                                    <td>#{{ task.id }}</td>
+                                    <td><span class="badge bg-info">{{ task.source_agent }}</span></td>
+                                    <td>
+                                        <small>
+                                            <a href="{{ task.page_url }}" target="_blank">
+                                                {{ task.page_url[:60] }}...
+                                            </a>
+                                        </small>
+                                    </td>
+                                    <td>
+                                        {% if task.observer_task_id %}
+                                        <a href="/agents/observer/#task-{{ task.observer_task_id }}" target="_blank">
+                                            #{{ task.observer_task_id }}
+                                        </a>
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                    <td><small>{{ task.verification_started_at.strftime('%Y-%m-%d %H:%M') if task.verification_started_at else '-' }}</small></td>
+                                    <td>
+                                        <button class="btn btn-xs btn-info" onclick="viewHistory({{ task.id }})">
+                                            📋 Geçmiş
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Başarılı Doğrulamalar -->
+    {% if verified_success_tasks %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5>✅ Başarılı Doğrulamalar (Son 20)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Agent</th>
+                                    <th>Sayfa URL</th>
+                                    <th>Görev Tipi</th>
+                                    <th>Tamamlanma</th>
+                                    <th>İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for task in verified_success_tasks %}
+                                <tr>
+                                    <td>#{{ task.id }}</td>
+                                    <td><span class="badge bg-success">{{ task.source_agent }}</span></td>
+                                    <td>
+                                        <small>
+                                            <a href="{{ task.page_url }}" target="_blank">
+                                                {{ task.page_url[:60] }}...
+                                            </a>
+                                        </small>
+                                    </td>
+                                    <td><code>{{ task.task_type }}</code></td>
+                                    <td><small>{{ task.verification_completed_at.strftime('%Y-%m-%d %H:%M') if task.verification_completed_at else '-' }}</small></td>
+                                    <td>
+                                        <button class="btn btn-xs btn-info" onclick="viewHistory({{ task.id }})">
+                                            📋 Görev Hikayesi
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Başarısız Doğrulamalar -->
+    {% if verified_failed_tasks %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5>❌ Başarısız Doğrulamalar (Son 20)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Agent</th>
+                                    <th>Sayfa URL</th>
+                                    <th>Görev Tipi</th>
+                                    <th>Tekrar Sayısı</th>
+                                    <th>Tamamlanma</th>
+                                    <th>İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for task in verified_failed_tasks %}
+                                <tr>
+                                    <td>#{{ task.id }}</td>
+                                    <td><span class="badge bg-danger">{{ task.source_agent }}</span></td>
+                                    <td>
+                                        <small>
+                                            <a href="{{ task.page_url }}" target="_blank">
+                                                {{ task.page_url[:60] }}...
+                                            </a>
+                                        </small>
+                                    </td>
+                                    <td><code>{{ task.task_type }}</code></td>
+                                    <td><span class="badge bg-warning">Retry #{{ task.retry_count }}</span></td>
+                                    <td><small>{{ task.verification_completed_at.strftime('%Y-%m-%d %H:%M') if task.verification_completed_at else '-' }}</small></td>
+                                    <td>
+                                        <button class="btn btn-xs btn-info" onclick="viewHistory({{ task.id }})">
+                                            📋 Görev Hikayesi
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- History Modal -->
+<div class="modal fade" id="historyModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">📋 Görev Hikayesi</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="historyContent">
+                <p class="text-center">Yükleniyor...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function verifyTask(taskId) {
+    if (!confirm('Bu görevi doğrulamak için Observer\'a göndermek istiyor musunuz?')) {
+        return;
+    }
+
+    fetch(`/agents/controller/api/verify/${taskId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'verifying') {
+            alert('✅ Görev Observer\'a gönderildi!');
+            location.reload();
+        } else {
+            alert('Hata: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Hata: ' + error);
+    });
+}
+
+function autoVerifyPending() {
+    if (!confirm('Bekleyen görevleri otomatik olarak doğrulamak istiyor musunuz?')) {
+        return;
+    }
+
+    fetch('/agents/controller/api/auto-verify', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert(data.message);
+        location.reload();
+    })
+    .catch(error => {
+        alert('Hata: ' + error);
+    });
+}
+
+function checkVerifications() {
+    fetch('/agents/controller/api/check-verifications', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert(data.message);
+        location.reload();
+    })
+    .catch(error => {
+        alert('Hata: ' + error);
+    });
+}
+
+function viewHistory(taskId) {
+    const modal = new bootstrap.Modal(document.getElementById('historyModal'));
+    modal.show();
+
+    document.getElementById('historyContent').innerHTML = '<p class="text-center">Yükleniyor...</p>';
+
+    fetch(`/agents/controller/api/tasks/${taskId}/history`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            let html = '<div class="timeline">';
+
+            data.task_history.forEach(event => {
+                let badgeColor = 'secondary';
+                if (event.event_type.includes('SUCCESS')) badgeColor = 'success';
+                else if (event.event_type.includes('FAILED') || event.event_type.includes('ERROR')) badgeColor = 'danger';
+                else if (event.event_type.includes('STARTED') || event.event_type.includes('CREATED')) badgeColor = 'info';
+                else if (event.event_type.includes('RETRY')) badgeColor = 'warning';
+
+                html += `
+                <div class="mb-3 p-3 border-start border-3 border-${badgeColor}">
+                    <div class="d-flex justify-content-between">
+                        <span class="badge bg-${badgeColor}">${event.event_type}</span>
+                        <small class="text-muted">${new Date(event.timestamp).toLocaleString('tr-TR')}</small>
+                    </div>
+                    <p class="mt-2 mb-0">${event.message}</p>
+                    ${event.data && Object.keys(event.data).length > 0 ? `
+                        <details class="mt-2">
+                            <summary>Detaylar</summary>
+                            <pre class="mt-2 p-2 bg-light rounded"><code>${JSON.stringify(event.data, null, 2)}</code></pre>
+                        </details>
+                    ` : ''}
+                </div>
+                `;
+            });
+
+            html += '</div>';
+            document.getElementById('historyContent').innerHTML = html;
+        } else {
+            document.getElementById('historyContent').innerHTML = '<p class="text-danger">Hata: ' + data.message + '</p>';
+        }
+    })
+    .catch(error => {
+        document.getElementById('historyContent').innerHTML = '<p class="text-danger">Hata: ' + error + '</p>';
+    });
+}
+
+// Auto refresh every 30 seconds
+setTimeout(() => {
+    location.reload();
+}, 30000);
+</script>
+{% endblock %}

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c:*)",
+      "Bash(python3:*)",
+      "Bash(wc:*)",
+      "Bash(python -m py_compile:*)",
+      "Bash(source:*)",
+      "Bash(python check_html_content.py:*)",
+      "Bash(python:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

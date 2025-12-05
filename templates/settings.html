@@ -1,0 +1,569 @@
+{% extends "base.html" %}
+
+{% block title %}Ayarlar - Rakip İstihbarat{% endblock %}
+{% block page_title %}Ayarlar{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-4xl">
+    
+    {% if request.query_params.get('success') %}
+    <div class="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center space-x-3">
+        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+        </svg>
+        <p class="text-green-800">Ayarlar başarıyla kaydedildi!</p>
+    </div>
+    {% endif %}
+    
+    <form action="/settings/update" method="POST" class="space-y-6">
+        
+        <!-- API Settings -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-800">API Ayarları</h2>
+                <p class="text-sm text-gray-500 mt-1">Harici servis entegrasyonları için API anahtarları</p>
+            </div>
+            
+            <div class="p-6 space-y-6">
+                <!-- Google Search (RapidAPI) -->
+                <div class="p-4 bg-gray-50 rounded-lg">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-4">Google Search API (RapidAPI)</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="rapidapi_key" class="block text-xs font-medium text-gray-500 mb-1">API Key</label>
+                            <input type="password" id="rapidapi_key" name="rapidapi_key"
+                                   placeholder="••••••••••••••••"
+                                   {% for s in api_settings %}{% if s.key == 'RAPIDAPI_KEY' %}value="{{ s.value }}"{% endif %}{% endfor %}
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label for="rapidapi_host" class="block text-xs font-medium text-gray-500 mb-1">API Host</label>
+                            <input type="text" id="rapidapi_host" name="rapidapi_host"
+                                   {% for s in api_settings %}{% if s.key == 'RAPIDAPI_HOST' %}value="{{ s.value }}"{% endif %}{% endfor %}
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+                    
+                    <button type="button" onclick="testGoogleAPI()" 
+                            class="mt-3 px-3 py-1.5 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors">
+                        API'yi Test Et
+                    </button>
+                    <span id="google-test-result" class="ml-2 text-xs"></span>
+                </div>
+                
+                <!-- Gemini AI -->
+                <div class="p-4 bg-gray-50 rounded-lg">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-4">Gemini AI</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="gemini_api_key" class="block text-xs font-medium text-gray-500 mb-1">API Key</label>
+                            <input type="password" id="gemini_api_key" name="gemini_api_key"
+                                   placeholder="••••••••••••••••"
+                                   {% for s in api_settings %}{% if s.key == 'GEMINI_API_KEY' %}value="{{ s.value }}"{% endif %}{% endfor %}
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label for="gemini_model" class="block text-xs font-medium text-gray-500 mb-1">Model</label>
+                            <input type="text" id="gemini_model" name="gemini_model"
+                                   {% for s in api_settings %}{% if s.key == 'GEMINI_MODEL' %}value="{{ s.value }}"{% endif %}{% endfor %}
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+
+                    <button type="button" onclick="testGeminiAPI()"
+                            class="mt-3 px-3 py-1.5 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors">
+                        API'yi Test Et
+                    </button>
+                    <span id="gemini-test-result" class="ml-2 text-xs"></span>
+                </div>
+
+                <!-- Deepseek AI -->
+                <div class="p-4 bg-gray-50 rounded-lg">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-4">Deepseek AI (RapidAPI)</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="deepseek_api_key" class="block text-xs font-medium text-gray-500 mb-1">RapidAPI Key</label>
+                            <input type="password" id="deepseek_api_key" name="deepseek_api_key"
+                                   placeholder="••••••••••••••••"
+                                   {% for s in api_settings %}{% if s.key == 'DEEPSEEK_API_KEY' %}value="{{ s.value }}"{% endif %}{% endfor %}
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label for="deepseek_host" class="block text-xs font-medium text-gray-500 mb-1">RapidAPI Host</label>
+                            <input type="text" id="deepseek_host" name="deepseek_host"
+                                   {% for s in api_settings %}{% if s.key == 'DEEPSEEK_HOST' %}value="{{ s.value }}"{% endif %}{% endfor %}
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+
+                    <button type="button" onclick="testDeepseekAPI()"
+                            class="mt-3 px-3 py-1.5 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors">
+                        API'yi Test Et
+                    </button>
+                    <span id="deepseek-test-result" class="ml-2 text-xs"></span>
+                </div>
+                
+                <!-- OpenAI (AI Helper için) -->
+                <div class="p-4 bg-gray-50 rounded-lg">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-4">OpenAI (AI Helper için)</h3>
+                    
+                    <div>
+                        <label for="openai_api_key" class="block text-xs font-medium text-gray-500 mb-1">API Key</label>
+                        <input type="password" id="openai_api_key" name="openai_api_key"
+                               placeholder="sk-..."
+                               {% for s in api_settings %}{% if s.key == 'OPENAI_API_KEY' %}value="{{ s.value }}"{% endif %}{% endfor %}
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                        <p class="text-xs text-gray-500 mt-1">AI Helper modülü için OpenAI API anahtarı</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- AI Helper Settings -->
+        {% if ai_helper_projects %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-800">AI Helper Ayarları</h2>
+                <p class="text-sm text-gray-500 mt-1">AI Helper projeleri için AI model seçimi ve analiz başlatma</p>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                {% for project in ai_helper_projects %}
+                <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 class="font-semibold text-gray-800">{{ project.project_name }}</h3>
+                            <p class="text-xs text-gray-500 mt-1">Site ID: {{ project.site_id }} | Durum: {{ project.status }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label for="ai_provider_{{ project.id }}" class="block text-xs font-medium text-gray-500 mb-1">AI Provider</label>
+                            <select id="ai_provider_{{ project.id }}" 
+                                    name="ai_provider_{{ project.id }}"
+                                    onchange="updateModelSelect({{ project.id }})"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                                <option value="gemini" {% if project.ai_provider == 'gemini' or not project.ai_provider %}selected{% endif %}>Gemini AI</option>
+                                <option value="deepseek" {% if project.ai_provider == 'deepseek' %}selected{% endif %}>Deepseek AI</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="ai_model_{{ project.id }}" class="block text-xs font-medium text-gray-500 mb-1">AI Modeli</label>
+                            <select id="ai_model_{{ project.id }}" 
+                                    name="ai_model_{{ project.id }}"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                                <option value="gemini-flash-latest" {% if project.ai_model == 'gemini-flash-latest' or not project.ai_model %}selected{% endif %}>Gemini Flash Latest</option>
+                                <option value="gemini-pro" {% if project.ai_model == 'gemini-pro' %}selected{% endif %}>Gemini Pro</option>
+                                <option value="deepseek-chat" {% if project.ai_model == 'deepseek-chat' %}selected{% endif %}>Deepseek Chat</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <button type="button" 
+                                    onclick="saveAIHelperSettings({{ project.id }}, '{{ project.project_name }}')"
+                                    class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium">
+                                💾 Kaydet
+                            </button>
+                            <button type="button" 
+                                    onclick="startAnalysis({{ project.id }}, '{{ project.project_name }}')"
+                                    class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
+                                🔄 Analize Başla
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Scan Settings -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-800">Tarama Ayarları</h2>
+                <p class="text-sm text-gray-500 mt-1">Otomatik tarama ve değişiklik algılama ayarları</p>
+            </div>
+            
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="scan_interval_hours" class="block text-sm font-medium text-gray-700 mb-1">
+                            Tarama Sıklığı (Saat)
+                        </label>
+                        <input type="number" id="scan_interval_hours" name="scan_interval_hours" min="1" max="168"
+                               {% for s in scan_settings %}{% if s.key == 'SCAN_INTERVAL_HOURS' %}value="{{ s.value }}"{% endif %}{% endfor %}
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <p class="text-xs text-gray-500 mt-1">Siteler bu aralıkta otomatik taranır</p>
+                    </div>
+                    
+                    <div>
+                        <label for="change_threshold_percent" class="block text-sm font-medium text-gray-700 mb-1">
+                            Değişim Eşiği (%)
+                        </label>
+                        <input type="number" id="change_threshold_percent" name="change_threshold_percent" min="0" max="100" step="0.1"
+                               {% for s in scan_settings %}{% if s.key == 'CHANGE_THRESHOLD_PERCENT' %}value="{{ s.value }}"{% endif %}{% endfor %}
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <p class="text-xs text-gray-500 mt-1">Bu yüzdenin altındaki değişimler görmezden gelinir</p>
+                    </div>
+                    
+                    <div>
+                        <label for="max_concurrent_scans" class="block text-sm font-medium text-gray-700 mb-1">
+                            Max Eşzamanlı Tarama
+                        </label>
+                        <input type="number" id="max_concurrent_scans" name="max_concurrent_scans" min="1" max="10"
+                               {% for s in scan_settings %}{% if s.key == 'MAX_CONCURRENT_SCANS' %}value="{{ s.value }}"{% endif %}{% endfor %}
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <p class="text-xs text-gray-500 mt-1">Aynı anda kaç site taranabilir</p>
+                    </div>
+                    
+                    <div>
+                        <label for="request_delay_seconds" class="block text-sm font-medium text-gray-700 mb-1">
+                            İstek Arası Bekleme (sn)
+                        </label>
+                        <input type="number" id="request_delay_seconds" name="request_delay_seconds" min="0.5" max="30" step="0.5"
+                               {% for s in scan_settings %}{% if s.key == 'REQUEST_DELAY_SECONDS' %}value="{{ s.value }}"{% endif %}{% endfor %}
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <p class="text-xs text-gray-500 mt-1">Anti-bot koruması için istekler arası bekleme süresi</p>
+                    </div>
+                    
+                    <div>
+                        <label for="freshness_threshold_days" class="block text-sm font-medium text-gray-700 mb-1">
+                            Freshness Eşiği (Gün)
+                        </label>
+                        <input type="number" id="freshness_threshold_days" name="freshness_threshold_days" min="7" max="365"
+                               {% for s in scan_settings %}{% if s.key == 'FRESHNESS_THRESHOLD_DAYS' %}value="{{ s.value }}"{% endif %}{% endfor %}
+                               value="45"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <p class="text-xs text-gray-500 mt-1">Bu günden eski sayfalar "eski içerik" olarak raporlanır</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Save Button -->
+        <div class="flex justify-end">
+            <button type="submit" 
+                    class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                Kaydet
+            </button>
+        </div>
+        
+    </form>
+    
+    <!-- Task Management -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="p-6 border-b border-gray-100">
+            <h2 class="text-lg font-semibold text-gray-800">Görev Yönetimi</h2>
+            <p class="text-sm text-gray-500 mt-1">Tüm agent görevlerini temizle</p>
+        </div>
+        <div class="p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-700 mb-2">Bu işlem tüm agent görevlerini kalıcı olarak siler:</p>
+                    <ul class="text-xs text-gray-600 space-y-1 ml-4 list-disc">
+                        <li>Observer görevleri ve raporları</li>
+                        <li>Reviewer kuyruk öğeleri</li>
+                        <li>Dispatcher görevleri</li>
+                        <li>Link Fixer görevleri</li>
+                    </ul>
+                </div>
+                <button type="button" 
+                        onclick="clearAllTasks()"
+                        class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium">
+                    🗑️ Bütün Görevleri Sil
+                </button>
+            </div>
+            <div id="clear-tasks-result" class="mt-4"></div>
+        </div>
+    </div>
+    
+    <!-- System Info -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="p-6 border-b border-gray-100">
+            <h2 class="text-lg font-semibold text-gray-800">Sistem Bilgisi</h2>
+        </div>
+        <div class="p-6">
+            <dl class="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <dt class="text-gray-500">Versiyon</dt>
+                    <dd class="text-gray-800 font-medium">v2.0.0</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Veritabanı</dt>
+                    <dd class="text-gray-800 font-medium">SQLite</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Framework</dt>
+                    <dd class="text-gray-800 font-medium">FastAPI</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Python</dt>
+                    <dd class="text-gray-800 font-medium">3.10+</dd>
+                </div>
+            </dl>
+        </div>
+    </div>
+    
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    async function testGoogleAPI() {
+        const resultSpan = document.getElementById('google-test-result');
+        resultSpan.textContent = 'Test ediliyor...';
+        resultSpan.className = 'ml-2 text-xs text-gray-500';
+        
+        try {
+            const response = await fetch('/settings/test-google-api', { method: 'POST' });
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                resultSpan.textContent = '✓ ' + data.message;
+                resultSpan.className = 'ml-2 text-xs text-green-600';
+            } else {
+                resultSpan.textContent = '✗ ' + data.message;
+                resultSpan.className = 'ml-2 text-xs text-red-600';
+            }
+        } catch (error) {
+            resultSpan.textContent = '✗ Bağlantı hatası';
+            resultSpan.className = 'ml-2 text-xs text-red-600';
+        }
+    }
+    
+    async function testGeminiAPI() {
+        const resultSpan = document.getElementById('gemini-test-result');
+        resultSpan.textContent = 'Test ediliyor...';
+        resultSpan.className = 'ml-2 text-xs text-gray-500';
+
+        try {
+            const response = await fetch('/settings/test-gemini-api', { method: 'POST' });
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                resultSpan.textContent = '✓ ' + data.message;
+                resultSpan.className = 'ml-2 text-xs text-green-600';
+            } else {
+                resultSpan.textContent = '✗ ' + data.message;
+                resultSpan.className = 'ml-2 text-xs text-red-600';
+            }
+        } catch (error) {
+            resultSpan.textContent = '✗ Bağlantı hatası';
+            resultSpan.className = 'ml-2 text-xs text-red-600';
+        }
+    }
+
+    async function testDeepseekAPI() {
+        const resultSpan = document.getElementById('deepseek-test-result');
+        resultSpan.textContent = 'Test ediliyor...';
+        resultSpan.className = 'ml-2 text-xs text-gray-500';
+
+        try {
+            const response = await fetch('/settings/test-deepseek-api', { method: 'POST' });
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                resultSpan.textContent = '✓ ' + data.message;
+                resultSpan.className = 'ml-2 text-xs text-green-600';
+            } else {
+                resultSpan.textContent = '✗ ' + data.message;
+                resultSpan.className = 'ml-2 text-xs text-red-600';
+            }
+        } catch (error) {
+            resultSpan.textContent = '✗ Bağlantı hatası';
+            resultSpan.className = 'ml-2 text-xs text-red-600';
+        }
+    }
+
+    // Password toggle
+    document.querySelectorAll('input[type="password"]').forEach(input => {
+        input.addEventListener('focus', () => input.type = 'text');
+        input.addEventListener('blur', () => input.type = 'password');
+    });
+    
+    // AI Helper - Provider değiştiğinde model seçeneklerini güncelle
+    function updateModelSelect(projectId) {
+        const providerSelect = document.getElementById('ai_provider_' + projectId);
+        const modelSelect = document.getElementById('ai_model_' + projectId);
+        const selectedProvider = providerSelect.value;
+        
+        // Model seçeneklerini temizle
+        modelSelect.innerHTML = '';
+        
+        if (selectedProvider === 'gemini') {
+            modelSelect.innerHTML = '<option value="gemini-flash-latest">Gemini Flash Latest</option><option value="gemini-pro">Gemini Pro</option>';
+            modelSelect.value = 'gemini-flash-latest';
+        } else if (selectedProvider === 'deepseek') {
+            modelSelect.innerHTML = '<option value="deepseek-chat">Deepseek Chat</option>';
+            modelSelect.value = 'deepseek-chat';
+        }
+    }
+    
+    // AI Helper - Sadece ayarları kaydet (analiz başlatmadan)
+    async function saveAIHelperSettings(projectId, projectName) {
+        const providerSelect = document.getElementById('ai_provider_' + projectId);
+        const modelSelect = document.getElementById('ai_model_' + projectId);
+        const selectedProvider = providerSelect.value;
+        const selectedModel = modelSelect.value;
+        
+        try {
+            const updateResponse = await fetch('/agents/ai-helper/project/' + projectId + '/update-model', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    ai_provider: selectedProvider,
+                    ai_model: selectedModel
+                })
+            });
+            
+            const updateData = await updateResponse.json();
+            if (updateData.status === 'success') {
+                alert('✅ Ayarlar kaydedildi!\n\nProvider: ' + selectedProvider.toUpperCase() + '\nModel: ' + selectedModel);
+                // Sayfayı yenile
+                window.location.reload();
+            } else {
+                alert('Hata: ' + updateData.message);
+            }
+        } catch (error) {
+            alert('Hata: ' + error.message);
+        }
+    }
+    
+    // AI Helper - Model güncelleme ve analiz başlatma
+    async function startAnalysis(projectId, projectName) {
+        const providerSelect = document.getElementById('ai_provider_' + projectId);
+        const modelSelect = document.getElementById('ai_model_' + projectId);
+        const selectedProvider = providerSelect.value;
+        const selectedModel = modelSelect.value;
+        
+        if (!confirm('"' + projectName + '" projesi için analizi başlatmak istediğinize emin misiniz?\n\nSeçilen Provider: ' + selectedProvider.toUpperCase() + '\nSeçilen Model: ' + selectedModel)) {
+            return;
+        }
+        
+        // Önce provider ve modeli güncelle
+        try {
+            const updateResponse = await fetch('/agents/ai-helper/project/' + projectId + '/update-model', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    ai_provider: selectedProvider,
+                    ai_model: selectedModel
+                })
+            });
+            
+            const updateData = await updateResponse.json();
+            if (updateData.status !== 'success') {
+                alert('Model güncelleme hatası: ' + updateData.message);
+                return;
+            }
+        } catch (error) {
+            alert('Model güncelleme hatası: ' + error.message);
+            return;
+        }
+        
+        // Sonra analizi başlat
+        try {
+            const response = await fetch('/agents/ai-helper/project/' + projectId + '/start-analysis', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const data = await response.json();
+            if (data.status === 'success') {
+                alert('✅ Analiz başlatıldı!\n\nProje dashboard\'una giderek logları takip edebilirsiniz.');
+                window.location.href = '/agents/ai-helper/project/' + projectId;
+            } else {
+                alert('Hata: ' + data.message);
+            }
+        } catch (error) {
+            alert('Hata: ' + error.message);
+        }
+    }
+    
+    // Tüm görevleri temizle
+    async function clearAllTasks() {
+        if (!confirm('⚠️ DİKKAT!\n\nTüm agent görevleri kalıcı olarak silinecek:\n- Observer görevleri ve raporları\n- Reviewer kuyruk öğeleri\n- Dispatcher görevleri\n- Link Fixer görevleri\n\nBu işlem geri alınamaz. Devam etmek istediğinize emin misiniz?')) {
+            return;
+        }
+        
+        const resultDiv = document.getElementById('clear-tasks-result');
+        resultDiv.innerHTML = '<p class="text-sm text-gray-600">⏳ Görevler temizleniyor...</p>';
+        
+        try {
+            const response = await fetch('/agents/observer/api/clear-all-tasks', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                let message = '✅ ' + data.message + '\n\n';
+                if (data.deleted_counts) {
+                    message += 'Silinen görevler:\n';
+                    if (data.deleted_counts.observer_tasks) {
+                        message += `- Observer görevleri: ${data.deleted_counts.observer_tasks}\n`;
+                    }
+                    if (data.deleted_counts.observer_reports) {
+                        message += `- Observer raporları: ${data.deleted_counts.observer_reports}\n`;
+                    }
+                    if (data.deleted_counts.reviewer_queue) {
+                        message += `- Reviewer kuyruk: ${data.deleted_counts.reviewer_queue}\n`;
+                    }
+                    if (data.deleted_counts.dispatcher_tasks) {
+                        message += `- Dispatcher görevleri: ${data.deleted_counts.dispatcher_tasks}\n`;
+                    }
+                    if (data.deleted_counts.link_fix_tasks) {
+                        message += `- Link Fixer görevleri: ${data.deleted_counts.link_fix_tasks}\n`;
+                    }
+                }
+                
+                resultDiv.innerHTML = `
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <p class="text-sm text-green-800 font-medium">${data.message}</p>
+                        ${data.deleted_counts ? `
+                            <div class="mt-2 text-xs text-green-700">
+                                <ul class="list-disc ml-4 space-y-1">
+                                    ${data.deleted_counts.observer_tasks ? `<li>Observer görevleri: ${data.deleted_counts.observer_tasks}</li>` : ''}
+                                    ${data.deleted_counts.observer_reports ? `<li>Observer raporları: ${data.deleted_counts.observer_reports}</li>` : ''}
+                                    ${data.deleted_counts.reviewer_queue ? `<li>Reviewer kuyruk: ${data.deleted_counts.reviewer_queue}</li>` : ''}
+                                    ${data.deleted_counts.dispatcher_tasks ? `<li>Dispatcher görevleri: ${data.deleted_counts.dispatcher_tasks}</li>` : ''}
+                                    ${data.deleted_counts.link_fix_tasks ? `<li>Link Fixer görevleri: ${data.deleted_counts.link_fix_tasks}</li>` : ''}
+                                </ul>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+                
+                // 3 saniye sonra sayfayı yenile
+                setTimeout(() => {
+                    window.location.reload();
+                }, 3000);
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <p class="text-sm text-red-800">❌ Hata: ${data.message}</p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            resultDiv.innerHTML = `
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p class="text-sm text-red-800">❌ Bağlantı hatası: ${error.message}</p>
+                </div>
+            `;
+        }
+    }
+</script>
+{% endblock %}

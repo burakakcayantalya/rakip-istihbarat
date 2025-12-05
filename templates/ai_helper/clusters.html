@@ -1,0 +1,769 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.project_name }} - Kümeler{% endblock %}
+{% block page_title %}AI Helper: {{ project.project_name }} - Kümeler{% endblock %}
+
+{% block content %}
+<!-- Toast Notification Container -->
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+<script>
+(function() {
+    'use strict';
+    
+    // Toast notification fonksiyonu
+    window.showToast = function(message, type) {
+        type = type || 'success'; // success, error, info
+        const container = document.getElementById('toastContainer');
+        if (!container) return;
+        
+        const toast = document.createElement('div');
+        const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+        toast.className = bgColor + ' text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-3 min-w-[300px] max-w-[500px] animate-slide-in';
+        toast.innerHTML = '<span>' + message + '</span><button onclick="this.parentElement.remove()" class="ml-auto text-white hover:text-gray-200">✕</button>';
+        
+        container.appendChild(toast);
+        
+        // 3 saniye sonra otomatik kaldır
+        setTimeout(function() {
+            if (toast.parentElement) {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(function() {
+                    if (toast.parentElement) {
+                        toast.remove();
+                    }
+                }, 300);
+            }
+        }, 3000);
+    };
+})();
+</script>
+
+<style>
+@keyframes slide-in {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+.animate-slide-in {
+    animation: slide-in 0.3s ease-out;
+}
+</style>
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-xl font-semibold text-gray-800 mb-2">Oluşturulan Kümeler</h2>
+                <p class="text-sm text-gray-600">Toplam {{ total_clusters }} küme</p>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="showCreateClusterModal()" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    ➕ Yeni Cluster
+                </button>
+                <button onclick="reclusterUrls()" 
+                        class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                    🔄 Tekrar Kümelendir
+                </button>
+                <a href="/ai-helper/project/{{ project.id }}" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                    ← Dashboard'a Dön
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Kümeler Listesi -->
+    {% if clusters %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="space-y-3">
+            {% for cluster in clusters %}
+            <div class="border border-gray-200 rounded-lg overflow-hidden">
+                <div class="bg-gray-50 px-4 py-3 flex items-center justify-between">
+                    <div class="flex items-center space-x-3 flex-1 cursor-pointer hover:bg-gray-100 transition-colors"
+                         onclick="toggleCluster({{ cluster.id }})">
+                        <span class="text-gray-500 text-sm" id="cluster-icon-{{ cluster.id }}">▶</span>
+                        <span class="font-semibold text-gray-800">{{ cluster.cluster_name }}</span>
+                        <span class="text-sm text-gray-500">
+                            {% if cluster.urls_json %}
+                                ({{ cluster.urls_json|length }} URL)
+                            {% else %}
+                                (0 URL)
+                            {% endif %}
+                        </span>
+                        <span id="selected-count-{{ cluster.id }}" class="text-xs text-blue-600 font-medium hidden">
+                            (<span id="selected-count-num-{{ cluster.id }}">0</span> seçili)
+                        </span>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <button onclick="editClusterName({{ cluster.id }}, '{{ cluster.cluster_name }}')" 
+                                class="px-3 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm"
+                                title="Cluster adını düzenle">
+                            ✏️ Düzenle
+                        </button>
+                        <button onclick="deleteCluster({{ cluster.id }}, '{{ cluster.cluster_name }}')" 
+                                class="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                                title="Cluster'ı sil">
+                            🗑️ Sil
+                        </button>
+                        <select id="ai-provider-{{ cluster.id }}" 
+                                class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                            <option value="gemini">Google Gemini</option>
+                            <option value="deepseek">Deepseek</option>
+                        </select>
+                        <button onclick="auditCluster({{ cluster.id }}, '{{ cluster.cluster_name }}')" 
+                                class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm"
+                                id="audit-btn-{{ cluster.id }}">
+                            🔍 Denetle
+                        </button>
+                        <span class="text-xs text-gray-500">
+                            {{ cluster.created_at.strftime('%d.%m.%Y %H:%M') }}
+                        </span>
+                    </div>
+                </div>
+                <div id="cluster-detail-{{ cluster.id }}" class="hidden px-4 py-3 bg-white border-t border-gray-200">
+                    <!-- Internal Linking Hedefleri -->
+                    <div class="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                        <h4 class="text-sm font-semibold text-gray-700 mb-3">Internal Linking Hedefleri</h4>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Otorite Hedef</label>
+                                <select id="authority-target-{{ cluster.id }}" 
+                                        class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
+                                        onchange="updateClusterTargets({{ cluster.id }})">
+                                    <option value="">Seçiniz</option>
+                                    {% for other_cluster in clusters %}
+                                        {% if other_cluster.id != cluster.id %}
+                                        <option value="{{ other_cluster.id }}" {% if cluster.authority_target_cluster_id == other_cluster.id %}selected{% endif %}>
+                                            {{ other_cluster.cluster_name }}
+                                        </option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Tematik Hedef</label>
+                                <select id="thematic-target-{{ cluster.id }}" 
+                                        class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
+                                        onchange="updateClusterTargets({{ cluster.id }})">
+                                    <option value="">Seçiniz</option>
+                                    {% for other_cluster in clusters %}
+                                        {% if other_cluster.id != cluster.id %}
+                                        <option value="{{ other_cluster.id }}" {% if cluster.thematic_target_cluster_id == other_cluster.id %}selected{% endif %}>
+                                            {{ other_cluster.cluster_name }}
+                                        </option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Dolaylı Hedef</label>
+                                <select id="indirect-target-{{ cluster.id }}" 
+                                        class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
+                                        onchange="updateClusterTargets({{ cluster.id }})">
+                                    <option value="">Seçiniz</option>
+                                    {% for other_cluster in clusters %}
+                                        {% if other_cluster.id != cluster.id %}
+                                        <option value="{{ other_cluster.id }}" {% if cluster.indirect_target_cluster_id == other_cluster.id %}selected{% endif %}>
+                                            {{ other_cluster.cluster_name }}
+                                        </option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Zorunlu Hedef</label>
+                                <select id="mandatory-target-{{ cluster.id }}" 
+                                        class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
+                                        onchange="updateClusterTargets({{ cluster.id }})">
+                                    <option value="">Seçiniz</option>
+                                    {% for other_cluster in clusters %}
+                                        {% if other_cluster.id != cluster.id %}
+                                        <option value="{{ other_cluster.id }}" {% if cluster.mandatory_target_cluster_id == other_cluster.id %}selected{% endif %}>
+                                            {{ other_cluster.cluster_name }}
+                                        </option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if cluster.urls_json and cluster.urls_json|length > 0 %}
+                    <!-- Toplu İşlemler Bar -->
+                    <div id="bulk-actions-{{ cluster.id }}" class="hidden mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-sm font-medium text-blue-800">
+                                <span id="bulk-selected-count-{{ cluster.id }}">0</span> URL seçili
+                            </span>
+                            <button onclick="selectAllUrls({{ cluster.id }})" 
+                                    class="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors">
+                                Tümünü Seç
+                            </button>
+                            <button onclick="deselectAllUrls({{ cluster.id }})" 
+                                    class="px-3 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600 transition-colors">
+                                Seçimi Temizle
+                            </button>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <select id="bulk-move-target-{{ cluster.id }}" 
+                                    class="px-3 py-1 border border-gray-300 rounded text-sm bg-white">
+                                <option value="">Hedef Cluster Seç</option>
+                                {% for other_cluster in clusters %}
+                                    {% if other_cluster.id != cluster.id %}
+                                    <option value="{{ other_cluster.id }}">{{ other_cluster.cluster_name }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                            <button onclick="moveSelectedUrls({{ cluster.id }})" 
+                                    class="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors font-medium">
+                                Seçilenleri Taşı
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div class="space-y-2 max-h-96 overflow-y-auto">
+                        {% if cluster.urls_json %}
+                            {% for url in cluster.urls_json %}
+                            <div class="flex items-center justify-between text-sm text-gray-700 py-1.5 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors group">
+                                <div class="flex items-center space-x-2 flex-1">
+                                    <input type="checkbox" 
+                                           id="url-checkbox-{{ cluster.id }}-{{ loop.index0 }}"
+                                           class="url-checkbox" 
+                                           data-cluster-id="{{ cluster.id }}"
+                                           data-url="{{ url }}"
+                                           onchange="updateBulkActions({{ cluster.id }})"
+                                           class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="text-gray-500 mr-2">•</span> 
+                                    <a href="{{ url }}" target="_blank" class="text-blue-600 hover:underline break-all flex-1">{{ url }}</a>
+                                    <a href="#" 
+                                       onclick="window.location.href='/ai-helper/project/{{ project.id }}/url/audit-details?url=' + encodeURIComponent('{{ url }}'); return false;"
+                                       class="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors"
+                                       title="Denetim Detayları">
+                                        📊 Detay
+                                    </a>
+                                </div>
+                                <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <select id="move-url-{{ cluster.id }}-{{ loop.index0 }}" 
+                                            class="px-2 py-1 border border-gray-300 rounded text-xs bg-white"
+                                            onchange="moveUrlToCluster({{ cluster.id }}, '{{ url }}', this.value)">
+                                        <option value="">→ Taşı</option>
+                                        {% for other_cluster in clusters %}
+                                            {% if other_cluster.id != cluster.id %}
+                                            <option value="{{ other_cluster.id }}">{{ other_cluster.cluster_name }}</option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                    <button onclick="removeUrlFromCluster({{ cluster.id }}, '{{ url }}')" 
+                                            class="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600 transition-colors"
+                                            title="URL'yi cluster'dan kaldır">
+                                        ✕
+                                    </button>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-sm text-gray-500 py-4 text-center">Bu kümede URL bulunmuyor</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+        <p class="text-gray-500 text-lg">Henüz küme oluşturulmamış</p>
+        <p class="text-gray-400 text-sm mt-2">Analiz başlatıldığında kümeler burada görünecek</p>
+        <a href="/ai-helper/project/{{ project.id }}" class="inline-block mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+            Dashboard'a Dön
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Yeni Cluster Modal -->
+<div id="createClusterModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center" onclick="if(event.target === this) closeCreateClusterModal();">
+    <div class="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4" onclick="event.stopPropagation();">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Yeni Cluster Oluştur</h3>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Cluster Adı</label>
+                <input type="text" 
+                       id="newClusterName" 
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                       placeholder="Örn: Orthodontics, Periodontics"
+                       onkeydown="if(event.key === 'Enter') createCluster(); if(event.key === 'Escape') closeCreateClusterModal();">
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="createCluster()" 
+                        class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                    Oluştur
+                </button>
+                <button onclick="closeCreateClusterModal()" 
+                        class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                    İptal
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+    
+    window.toggleCluster = function(clusterId) {
+        const detail = document.getElementById('cluster-detail-' + clusterId);
+        const icon = document.getElementById('cluster-icon-' + clusterId);
+        
+        if (detail.classList.contains('hidden')) {
+            detail.classList.remove('hidden');
+            icon.textContent = '▼';
+        } else {
+            detail.classList.add('hidden');
+            icon.textContent = '▶';
+        }
+    };
+    
+    window.reclusterUrls = function() {
+        const projectId = {{ project.id }};
+        
+        if (!confirm('URL\'leri tekrar kümelendirmek istediğinize emin misiniz?\n\nMevcut kümeler güncellenecektir.')) {
+            return;
+        }
+        
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '⏳ Kümelendiriliyor...';
+        
+        fetch('/ai-helper/project/' + projectId + '/recluster', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                showToast(data.message, 'success');
+                setTimeout(function() {
+                    window.location.reload();
+                }, 500);
+            } else {
+                showToast('Hata: ' + data.message, 'error');
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        })
+        .catch(function(error) {
+            showToast('Hata: ' + error.message, 'error');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        });
+    };
+    
+    window.auditCluster = function(clusterId, clusterName) {
+        const projectId = {{ project.id }};
+        
+        // Seçilen AI provider'ı al
+        const providerSelect = document.getElementById('ai-provider-' + clusterId);
+        const selectedProvider = providerSelect ? providerSelect.value : 'gemini';
+        
+        if (!confirm('"' + clusterName + '" kümesini denetlemek istediğinize emin misiniz?\n\nAI Provider: ' + (selectedProvider === 'gemini' ? 'Google Gemini' : 'Deepseek') + '\n\nAI, bu kümedeki sayfalar arasında internal link yapısını kontrol edecektir.')) {
+            return;
+        }
+        
+        const btn = document.getElementById('audit-btn-' + clusterId);
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        providerSelect.disabled = true;
+        btn.textContent = '⏳ Denetleniyor...';
+        
+        fetch('/ai-helper/project/' + projectId + '/cluster/' + clusterId + '/audit', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                ai_provider: selectedProvider
+            })
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                showToast('Denetleme başlatıldı! ' + data.message, 'success');
+                // Sayfayı yenile veya sonuçları göster
+                setTimeout(function() {
+                    window.location.reload();
+                }, 500);
+            } else {
+                showToast('Hata: ' + data.message, 'error');
+                btn.disabled = false;
+                providerSelect.disabled = false;
+                btn.textContent = originalText;
+            }
+        })
+        .catch(function(error) {
+            showToast('Hata: ' + error.message, 'error');
+            btn.disabled = false;
+            providerSelect.disabled = false;
+            btn.textContent = originalText;
+        });
+    };
+    
+    window.showCreateClusterModal = function() {
+        document.getElementById('createClusterModal').classList.remove('hidden');
+        document.getElementById('newClusterName').value = '';
+        document.getElementById('newClusterName').focus();
+    };
+    
+    window.closeCreateClusterModal = function() {
+        document.getElementById('createClusterModal').classList.add('hidden');
+    };
+    
+    window.createCluster = function() {
+        const projectId = {{ project.id }};
+        const clusterName = document.getElementById('newClusterName').value.trim();
+        
+        if (!clusterName) {
+            showToast('Lütfen cluster adı girin', 'error');
+            return;
+        }
+        
+        fetch('/ai-helper/project/' + projectId + '/cluster/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                cluster_name: clusterName
+            })
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                showToast(data.message, 'success');
+                setTimeout(function() {
+                    window.location.reload();
+                }, 500);
+            } else {
+                showToast('Hata: ' + data.message, 'error');
+            }
+        })
+        .catch(function(error) {
+            showToast('Hata: ' + error.message, 'error');
+        });
+    };
+    
+    window.editClusterName = function(clusterId, currentName) {
+        const newName = prompt('Cluster adını güncelle:', currentName);
+        
+        if (!newName || newName.trim() === '' || newName === currentName) {
+            return;
+        }
+        
+        const projectId = {{ project.id }};
+        
+        fetch('/ai-helper/project/' + projectId + '/cluster/' + clusterId, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                cluster_name: newName.trim()
+            })
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                showToast(data.message, 'success');
+                setTimeout(function() {
+                    window.location.reload();
+                }, 500);
+            } else {
+                showToast('Hata: ' + data.message, 'error');
+            }
+        })
+        .catch(function(error) {
+            showToast('Hata: ' + error.message, 'error');
+        });
+    };
+    
+    window.moveUrlToCluster = function(sourceClusterId, url, targetClusterId) {
+        if (!targetClusterId) {
+            return;
+        }
+        
+        if (!confirm('Bu URL\'yi seçili cluster\'a taşımak istediğinize emin misiniz?')) {
+            // Dropdown'ı sıfırla
+            const select = event.target;
+            if (select) select.value = '';
+            return;
+        }
+        
+        const projectId = {{ project.id }};
+        
+        fetch('/ai-helper/project/' + projectId + '/cluster/' + sourceClusterId + '/move-url', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                url: url,
+                target_cluster_id: parseInt(targetClusterId)
+            })
+        })
+        .then(function(response) {
+            if (!response.ok) {
+                return response.text().then(function(text) {
+                    throw new Error('HTTP ' + response.status + ': ' + text);
+                });
+            }
+            return response.json();
+        })
+        .then(function(data) {
+            if (data.status === 'success') {
+                showToast(data.message, 'success');
+                setTimeout(function() {
+                    window.location.reload();
+                }, 500);
+            } else {
+                showToast('Hata: ' + data.message, 'error');
+                // Dropdown'ı sıfırla
+                const select = event.target;
+                if (select) select.value = '';
+            }
+        })
+        .catch(function(error) {
+            console.error('URL taşıma hatası:', error);
+            showToast('Hata: ' + error.message, 'error');
+            // Dropdown'ı sıfırla
+            const select = event.target;
+            if (select) select.value = '';
+        });
+    };
+    
+    window.updateBulkActions = function(clusterId) {
+        const checkboxes = document.querySelectorAll('input[type="checkbox"][data-cluster-id="' + clusterId + '"]');
+        const selectedCount = Array.from(checkboxes).filter(function(cb) { return cb.checked; }).length;
+        const bulkActions = document.getElementById('bulk-actions-' + clusterId);
+        const selectedCountSpan = document.getElementById('bulk-selected-count-' + clusterId);
+        const selectedCountBadge = document.getElementById('selected-count-' + clusterId);
+        const selectedCountNum = document.getElementById('selected-count-num-' + clusterId);
+        
+        if (selectedCount > 0) {
+            if (bulkActions) bulkActions.classList.remove('hidden');
+            if (selectedCountSpan) selectedCountSpan.textContent = selectedCount;
+            if (selectedCountBadge) {
+                selectedCountBadge.classList.remove('hidden');
+                if (selectedCountNum) selectedCountNum.textContent = selectedCount;
+            }
+        } else {
+            if (bulkActions) bulkActions.classList.add('hidden');
+            if (selectedCountBadge) selectedCountBadge.classList.add('hidden');
+        }
+    };
+    
+    window.selectAllUrls = function(clusterId) {
+        const checkboxes = document.querySelectorAll('input[type="checkbox"][data-cluster-id="' + clusterId + '"]');
+        checkboxes.forEach(function(cb) {
+            cb.checked = true;
+        });
+        updateBulkActions(clusterId);
+    };
+    
+    window.deselectAllUrls = function(clusterId) {
+        const checkboxes = document.querySelectorAll('input[type="checkbox"][data-cluster-id="' + clusterId + '"]');
+        checkboxes.forEach(function(cb) {
+            cb.checked = false;
+        });
+        updateBulkActions(clusterId);
+    };
+    
+    window.moveSelectedUrls = function(sourceClusterId) {
+        const checkboxes = document.querySelectorAll('input[type="checkbox"][data-cluster-id="' + sourceClusterId + '"]:checked');
+        const selectedUrls = Array.from(checkboxes).map(function(cb) {
+            return cb.getAttribute('data-url');
+        });
+        
+        if (selectedUrls.length === 0) {
+            showToast('Lütfen en az bir URL seçin', 'error');
+            return;
+        }
+        
+        const targetSelect = document.getElementById('bulk-move-target-' + sourceClusterId);
+        const targetClusterId = targetSelect ? targetSelect.value : '';
+        
+        if (!targetClusterId) {
+            showToast('Lütfen hedef cluster seçin', 'error');
+            return;
+        }
+        
+        if (!confirm(selectedUrls.length + ' URL\'yi seçili cluster\'a taşımak istediğinize emin misiniz?')) {
+            return;
+        }
+        
+        const projectId = {{ project.id }};
+        
+        fetch('/ai-helper/project/' + projectId + '/cluster/' + sourceClusterId + '/move-urls-bulk', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                urls: selectedUrls,
+                target_cluster_id: parseInt(targetClusterId)
+            })
+        })
+        .then(function(response) {
+            if (!response.ok) {
+                return response.text().then(function(text) {
+                    throw new Error('HTTP ' + response.status + ': ' + text);
+                });
+            }
+            return response.json();
+        })
+        .then(function(data) {
+            if (data.status === 'success') {
+                showToast(data.message, 'success');
+                setTimeout(function() {
+                    window.location.reload();
+                }, 500);
+            } else {
+                showToast('Hata: ' + data.message, 'error');
+            }
+        })
+        .catch(function(error) {
+            console.error('Toplu URL taşıma hatası:', error);
+            showToast('Hata: ' + error.message, 'error');
+        });
+    };
+    
+    window.updateClusterTargets = function(clusterId) {
+        const projectId = {{ project.id }};
+        const authorityTarget = document.getElementById('authority-target-' + clusterId).value;
+        const thematicTarget = document.getElementById('thematic-target-' + clusterId).value;
+        const indirectTarget = document.getElementById('indirect-target-' + clusterId).value;
+        const mandatoryTarget = document.getElementById('mandatory-target-' + clusterId).value;
+        
+        fetch('/ai-helper/project/' + projectId + '/cluster/' + clusterId + '/update-targets', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                authority_target_cluster_id: authorityTarget ? parseInt(authorityTarget) : null,
+                thematic_target_cluster_id: thematicTarget ? parseInt(thematicTarget) : null,
+                indirect_target_cluster_id: indirectTarget ? parseInt(indirectTarget) : null,
+                mandatory_target_cluster_id: mandatoryTarget ? parseInt(mandatoryTarget) : null
+            })
+        })
+        .then(function(response) {
+            if (!response.ok) {
+                return response.text().then(function(text) {
+                    throw new Error('HTTP ' + response.status + ': ' + text);
+                });
+            }
+            return response.json();
+        })
+        .then(function(data) {
+            if (data.status === 'success') {
+                showToast('Hedef cluster\'lar güncellendi', 'success');
+            } else {
+                showToast('Hata: ' + data.message, 'error');
+            }
+        })
+        .catch(function(error) {
+            console.error('Hedef cluster güncelleme hatası:', error);
+            showToast('Hata: ' + error.message, 'error');
+        });
+    };
+    
+    window.removeUrlFromCluster = function(clusterId, url) {
+        if (!confirm('Bu URL\'yi cluster\'dan kaldırmak istediğinize emin misiniz?')) {
+            return;
+        }
+        
+        const projectId = {{ project.id }};
+        
+        fetch('/ai-helper/project/' + projectId + '/cluster/' + clusterId + '/url', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                url: url
+            })
+        })
+        .then(function(response) {
+            if (!response.ok) {
+                return response.text().then(function(text) {
+                    throw new Error('HTTP ' + response.status + ': ' + text);
+                });
+            }
+            return response.json();
+        })
+        .then(function(data) {
+            if (data.status === 'success') {
+                showToast(data.message, 'success');
+                setTimeout(function() {
+                    window.location.reload();
+                }, 500);
+            } else {
+                showToast('Hata: ' + data.message, 'error');
+            }
+        })
+        .catch(function(error) {
+            console.error('URL kaldırma hatası:', error);
+            showToast('Hata: ' + error.message, 'error');
+        });
+    };
+    
+    window.deleteCluster = function(clusterId, clusterName) {
+        if (!confirm('Cluster\'ı silmek istediğinize emin misiniz?\n\nCluster: "' + clusterName + '"\n\nBu işlem geri alınamaz ve cluster\'daki tüm URL\'ler silinecektir.')) {
+            return;
+        }
+        
+        const projectId = {{ project.id }};
+        
+        fetch('/ai-helper/project/' + projectId + '/cluster/' + clusterId, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(function(response) {
+            if (!response.ok) {
+                return response.text().then(function(text) {
+                    throw new Error('HTTP ' + response.status + ': ' + text);
+                });
+            }
+            return response.json();
+        })
+        .then(function(data) {
+            if (data.status === 'success') {
+                showToast(data.message, 'success');
+                setTimeout(function() {
+                    window.location.reload();
+                }, 500);
+            } else {
+                showToast('Hata: ' + data.message, 'error');
+            }
+        })
+        .catch(function(error) {
+            console.error('Cluster silme hatası:', error);
+            showToast('Hata: ' + error.message, 'error');
+        });
+    };
+})();
+</script>
+{% endblock %}
+

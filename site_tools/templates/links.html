@@ -1,0 +1,650 @@
+{% extends "base.html" %}
+
+{% block title %}Internal Links - {{ site.name }}{% endblock %}
+{% block page_title %}Internal Links Raporu{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    
+    <!-- Back Button & Header -->
+    <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+            <a href="/site-tools/site/{{ site.id }}" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <div>
+                <h2 class="text-xl font-semibold text-gray-800">{{ site.name }}</h2>
+                <p class="text-sm text-gray-500">Internal Link Analizi</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Stats Summary -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <!-- Total -->
+        <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 text-center">
+            <p class="text-3xl font-bold text-gray-800">{{ stats.total }}</p>
+            <p class="text-sm text-gray-500">Toplam Link</p>
+        </div>
+        
+        <!-- OK -->
+        <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 text-center">
+            <p class="text-3xl font-bold text-green-600">{{ stats.ok }}</p>
+            <p class="text-sm text-gray-500">Çalışıyor (200)</p>
+        </div>
+        
+        <!-- Redirects -->
+        <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 text-center">
+            <p class="text-3xl font-bold text-blue-600">{{ stats.redirect }}</p>
+            <p class="text-sm text-gray-500">Redirect (301/302)</p>
+        </div>
+        
+        <!-- Broken -->
+        <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 text-center">
+            <p class="text-3xl font-bold text-red-600">{{ stats.broken }}</p>
+            <p class="text-sm text-gray-500">Kırık (404/500)</p>
+        </div>
+    </div>
+    
+    <!-- Filter Tabs & Limit Selector -->
+    <div class="flex items-center justify-between border-b border-gray-200 pb-4">
+        <div class="flex space-x-2">
+            <a href="/site-tools/links/{{ site.id }}?filter=all&limit={{ limit }}" 
+               class="px-4 py-2 text-sm font-medium border-b-2 transition-colors
+                      {% if filter == 'all' %}border-indigo-600 text-indigo-600{% else %}border-transparent text-gray-500 hover:text-gray-700{% endif %}">
+                Tümü ({{ stats.total }})
+            </a>
+            <a href="/site-tools/links/{{ site.id }}?filter=broken&limit={{ limit }}" 
+               class="px-4 py-2 text-sm font-medium border-b-2 transition-colors
+                      {% if filter == 'broken' %}border-red-600 text-red-600{% else %}border-transparent text-gray-500 hover:text-gray-700{% endif %}">
+                Kırık ({{ stats.broken }})
+            </a>
+            <a href="/site-tools/links/{{ site.id }}?filter=redirect&limit={{ limit }}" 
+               class="px-4 py-2 text-sm font-medium border-b-2 transition-colors
+                      {% if filter == 'redirect' %}border-blue-600 text-blue-600{% else %}border-transparent text-gray-500 hover:text-gray-700{% endif %}">
+                Redirect ({{ stats.redirect }})
+            </a>
+        </div>
+        
+        <!-- Limit Selector -->
+        <div class="flex items-center space-x-2">
+            <span class="text-sm text-gray-600">Göster:</span>
+            <div class="flex bg-gray-100 rounded-lg p-1">
+                <a href="/site-tools/links/{{ site.id }}?filter={{ filter }}&limit=100" 
+                   class="px-3 py-1 text-xs font-medium rounded transition-colors
+                          {% if limit == 100 %}bg-white shadow text-indigo-600{% else %}text-gray-600 hover:text-gray-800{% endif %}">
+                    100
+                </a>
+                <a href="/site-tools/links/{{ site.id }}?filter={{ filter }}&limit=200" 
+                   class="px-3 py-1 text-xs font-medium rounded transition-colors
+                          {% if limit == 200 %}bg-white shadow text-indigo-600{% else %}text-gray-600 hover:text-gray-800{% endif %}">
+                    200
+                </a>
+                <a href="/site-tools/links/{{ site.id }}?filter={{ filter }}&limit=500" 
+                   class="px-3 py-1 text-xs font-medium rounded transition-colors
+                          {% if limit == 500 %}bg-white shadow text-indigo-600{% else %}text-gray-600 hover:text-gray-800{% endif %}">
+                    500
+                </a>
+                <a href="/site-tools/links/{{ site.id }}?filter={{ filter }}&limit=1000" 
+                   class="px-3 py-1 text-xs font-medium rounded transition-colors
+                          {% if limit == 1000 %}bg-white shadow text-indigo-600{% else %}text-gray-600 hover:text-gray-800{% endif %}">
+                    1000
+                </a>
+            </div>
+            <span class="text-xs text-gray-500">({{ links|length }}/{{ total_links }})</span>
+        </div>
+    </div>
+    
+    {% if links %}
+    <!-- Links Table -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kaynak Sayfa</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hedef URL</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Durum</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Anchor Text</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Redirect</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for item in links %}
+                    <!-- Main Row -->
+                    <tr class="hover:bg-gray-50 {% if item.link.is_broken %}bg-red-50{% elif item.link.is_redirect %}bg-blue-50 cursor-pointer{% endif %}" 
+                        {% if item.link.is_redirect %}onclick="toggleRedirectDetail({{ item.link.id }})"{% endif %}
+                        data-link-id="{{ item.link.id }}">
+                        <!-- Source Page -->
+                        <td class="px-4 py-3">
+                            <div class="flex items-center space-x-2">
+                                {% if item.link.is_redirect %}
+                                <button onclick="event.stopPropagation(); toggleRedirectDetail({{ item.link.id }})" 
+                                        class="text-gray-400 hover:text-gray-600 transition-colors">
+                                    <svg class="w-4 h-4 redirect-arrow-{{ item.link.id }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </button>
+                                {% endif %}
+                                <div>
+                                    <p class="text-sm text-gray-800 truncate max-w-xs" title="{{ item.source_page.title if item.source_page else '' }}">
+                                        {{ item.source_page.title if item.source_page else 'Bilinmiyor' }}
+                                    </p>
+                                    <a href="{{ item.source_page.url if item.source_page else '#' }}" target="_blank" 
+                                       onclick="event.stopPropagation()"
+                                       class="text-xs text-indigo-600 hover:underline truncate block max-w-xs">
+                                        {{ item.source_page.url[:50] if item.source_page else '' }}...
+                                    </a>
+                                </div>
+                            </div>
+                        </td>
+                        
+                        <!-- Target URL -->
+                        <td class="px-4 py-3" onclick="event.stopPropagation()">
+                            <a href="{{ item.link.target_url }}" target="_blank" 
+                               class="text-sm text-gray-800 hover:text-indigo-600 truncate block max-w-xs"
+                               title="{{ item.link.target_url }}">
+                                {{ item.link.target_url[:60] }}...
+                            </a>
+                            {% if item.link.final_url and item.link.final_url != item.link.target_url %}
+                            <p class="text-xs text-green-600 truncate max-w-xs" title="{{ item.link.final_url }}">
+                                → {{ item.link.final_url[:50] }}...
+                            </p>
+                            {% endif %}
+                        </td>
+                        
+                        <!-- Status -->
+                        <td class="px-4 py-3 text-center" onclick="event.stopPropagation()">
+                            {% if item.link.status_code == 200 %}
+                            <span class="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                                200 OK
+                            </span>
+                            {% elif item.link.status_code in [301, 302, 303, 307, 308] %}
+                            <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                                {{ item.link.status_code }}
+                            </span>
+                            {% elif item.link.status_code == 404 %}
+                            <span class="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">
+                                404 Not Found
+                            </span>
+                            {% elif item.link.status_code >= 500 %}
+                            <span class="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">
+                                {{ item.link.status_code }} Error
+                            </span>
+                            {% elif item.link.status_code == 0 %}
+                            <span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-full">
+                                Bağlantı Hatası
+                            </span>
+                            {% else %}
+                            <span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-full">
+                                {{ item.link.status_code }}
+                            </span>
+                            {% endif %}
+                        </td>
+                        
+                        <!-- Anchor Text -->
+                        <td class="px-4 py-3" onclick="event.stopPropagation()">
+                            <p class="text-sm text-gray-600 truncate max-w-xs" title="{{ item.link.anchor_text }}">
+                                {{ item.link.anchor_text[:50] if item.link.anchor_text else '-' }}
+                            </p>
+                        </td>
+                        
+                        <!-- Redirect Chain & Fix Button -->
+                        <td class="px-4 py-3 text-center" onclick="event.stopPropagation()">
+                            {% if item.link.is_redirect and item.link.final_url %}
+                            <div class="flex flex-col items-center space-y-2">
+                                <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                                    {{ item.link.status_code }} Redirect
+                                </span>
+                                {% if site.wp_ssh_host or site.wp_api_url %}
+                                <button onclick="fixRedirectFromButton(this)"
+                                        data-link-id="{{ item.link.id }}"
+                                        data-old-url="{{ item.link.target_url|e }}"
+                                        data-new-url="{{ item.link.final_url|e }}"
+                                        data-page-id="{{ item.source_page.id }}"
+                                        data-page-url="{{ item.source_page.url|e }}"
+                                        data-page-title="{{ item.source_page.title|e }}"
+                                        class="px-3 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 transition-colors">
+                                    🔧 Otomatik Düzelt
+                                </button>
+                                {% else %}
+                                <button onclick="showManualFixInstructions({{ item.link.id }}, '{{ item.link.target_url }}', '{{ item.link.final_url }}', '{{ item.source_page.url }}', '{{ item.source_page.title }}')"
+                                        class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors">
+                                    📋 Manuel Düzeltme Talimatları
+                                </button>
+                                {% endif %}
+                            </div>
+                            {% elif item.link.redirect_count > 0 %}
+                            <span class="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full"
+                                  title="{% for r in item.link.redirect_chain %}{{ r.status }}: {{ r.url }}&#10;{% endfor %}">
+                                {{ item.link.redirect_count }} zincir
+                            </span>
+                            {% else %}
+                            <span class="text-xs text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    
+                    <!-- Expandable Detail Row for Redirects -->
+                    {% if item.link.is_redirect and item.link.final_url %}
+                    <tr id="redirect-detail-{{ item.link.id }}" class="hidden bg-gray-50 border-t-2 border-blue-200">
+                        <td colspan="5" class="px-4 py-4">
+                            <div class="space-y-4">
+                                <h4 class="text-sm font-semibold text-gray-800 mb-3">📋 Redirect Detayları</h4>
+                                
+                                <!-- Redirect Bulunan Sayfa -->
+                                <div class="bg-white rounded-lg p-4 border border-gray-200">
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        <span class="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">200 OK</span>
+                                        <span class="text-sm font-medium text-gray-700">Redirect Bulunan Sayfa</span>
+                                    </div>
+                                    <p class="text-sm text-gray-800 font-medium mb-1">{{ item.source_page.title if item.source_page else 'Bilinmiyor' }}</p>
+                                    <a href="{{ item.source_page.url if item.source_page else '#' }}" target="_blank" 
+                                       class="text-xs text-indigo-600 hover:underline break-all">
+                                        {{ item.source_page.url }}
+                                    </a>
+                                </div>
+                                
+                                <!-- Redirect Veren URL -->
+                                <div class="bg-white rounded-lg p-4 border border-gray-200">
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">{{ item.link.status_code }}</span>
+                                        <span class="text-sm font-medium text-gray-700">Redirect Veren URL</span>
+                                    </div>
+                                    <a href="{{ item.link.target_url }}" target="_blank" 
+                                       class="text-sm text-gray-800 hover:text-indigo-600 break-all">
+                                        {{ item.link.target_url }}
+                                    </a>
+                                    {% if item.link.anchor_text %}
+                                    <p class="text-xs text-gray-500 mt-1">Anchor Text: <span class="font-medium">{{ item.link.anchor_text }}</span></p>
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- Redirect Final URL -->
+                                <div class="bg-white rounded-lg p-4 border border-green-200 bg-green-50">
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        {% if item.link.final_status_code == 200 %}
+                                        <span class="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">200 OK</span>
+                                        {% elif item.link.final_status_code %}
+                                        <span class="px-2 py-1 bg-{% if item.link.final_status_code >= 400 %}red{% else %}yellow{% endif %}-100 text-{% if item.link.final_status_code >= 400 %}red{% else %}yellow{% endif %}-700 text-xs font-medium rounded">{{ item.link.final_status_code }}</span>
+                                        {% else %}
+                                        <span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded">Bilinmiyor</span>
+                                        {% endif %}
+                                        <span class="text-sm font-medium text-gray-700">Redirect Final URL</span>
+                                    </div>
+                                    <a href="{{ item.link.final_url }}" target="_blank" 
+                                       class="text-sm text-green-700 hover:text-green-800 break-all font-medium">
+                                        {{ item.link.final_url }}
+                                    </a>
+                                </div>
+                                
+                                <!-- Redirect Chain (if exists) -->
+                                {% if item.link.redirect_chain and item.link.redirect_chain|length > 1 %}
+                                <div class="bg-white rounded-lg p-4 border border-gray-200">
+                                    <p class="text-xs font-medium text-gray-700 mb-2">Redirect Zinciri:</p>
+                                    <div class="space-y-1">
+                                        {% for redirect in item.link.redirect_chain %}
+                                        <div class="flex items-center space-x-2 text-xs">
+                                            <span class="px-2 py-0.5 bg-gray-100 text-gray-700 rounded">{{ redirect.status }}</span>
+                                            <span class="text-gray-600">{{ redirect.url }}</span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <!-- No Links -->
+    <div class="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
+        <div class="text-5xl mb-4">🔗</div>
+        <h3 class="text-xl font-semibold text-gray-800">
+            {% if filter == 'broken' %}Kırık link bulunamadı{% elif filter == 'redirect' %}Redirect bulunamadı{% else %}Link bulunamadı{% endif %}
+        </h3>
+        <p class="text-gray-600 mt-2">
+            {% if filter != 'all' %}
+            <a href="/site-tools/links/{{ site.id }}?filter=all" class="text-indigo-600 hover:underline">Tüm linkleri göster</a>
+            {% else %}
+            Önce site analizini çalıştırın.
+            {% endif %}
+        </p>
+    </div>
+    {% endif %}
+    
+</div>
+
+<!-- Fix Redirect Log Modal -->
+<div id="fixRedirectLogModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-800">Otomatik Düzeltme İşlemi</h3>
+            <button onclick="closeFixLogModal()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="bg-gray-50 rounded-lg p-4 mb-4 border border-gray-200">
+            <div class="space-y-2 text-sm">
+                <div><strong>Kaynak Sayfa:</strong> <span id="logSourcePage">-</span></div>
+                <div><strong>Eski URL:</strong> <span id="logOldUrl" class="text-red-600">-</span></div>
+                <div><strong>Yeni URL:</strong> <span id="logNewUrl" class="text-green-600">-</span></div>
+            </div>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto bg-gray-900 rounded-lg p-4 mb-4 font-mono text-sm" style="max-height: 400px;">
+            <div id="fixLogContent" class="text-green-400 space-y-1">
+                <div>🔄 İşlem başlatılıyor...</div>
+            </div>
+        </div>
+        
+        <div class="flex items-center justify-between">
+            <div class="text-sm text-gray-600">
+                <span id="logStatus">İşleniyor...</span>
+            </div>
+            <div class="flex space-x-2">
+                <button onclick="closeFixLogModal()" id="logCloseBtn" class="hidden px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                    Kapat
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fix Redirect Modal -->
+<div id="fixRedirectModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl p-6 max-w-2xl w-full mx-4">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Redirect Link Düzelt</h3>
+        <div class="space-y-3 mb-4">
+            <div>
+                <p class="text-sm text-gray-600">Kaynak Sayfa:</p>
+                <p class="text-sm font-medium text-gray-800" id="modalSourcePage">-</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Eski URL:</p>
+                <p class="text-sm font-medium text-red-600 break-all" id="modalOldUrl">-</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Yeni URL:</p>
+                <p class="text-sm font-medium text-green-600 break-all" id="modalNewUrl">-</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-2 mb-4">
+            <input type="checkbox" id="dryRunCheck" class="rounded">
+            <label for="dryRunCheck" class="text-sm text-gray-600">Dry-run (sadece test, değişiklik yapma)</label>
+        </div>
+        <div id="fixResult" class="hidden mb-4 p-3 rounded"></div>
+        <div class="flex justify-end space-x-2">
+            <button onclick="closeFixModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                İptal
+            </button>
+            <button onclick="confirmFixRedirect()" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                Düzelt
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentFixData = null;
+let currentManualFixData = null;
+
+function showManualFixInstructions(linkId, oldUrl, newUrl, pageUrl, pageTitle) {
+    currentManualFixData = { linkId, oldUrl, newUrl, pageUrl, pageTitle };
+    
+    document.getElementById('manualPageTitle').textContent = pageTitle || 'Bilinmiyor';
+    document.getElementById('manualPageUrl').textContent = pageUrl;
+    document.getElementById('manualPageUrl').href = pageUrl;
+    document.getElementById('manualOldUrl').textContent = oldUrl;
+    document.getElementById('manualNewUrl').textContent = newUrl;
+    
+    // Edit URL oluştur (WordPress admin)
+    const editUrl = pageUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    document.getElementById('manualEditUrl').textContent = `WordPress Admin → Sayfalar → ${pageTitle || 'Sayfa'}`;
+    
+    document.getElementById('manualSearchUrl').textContent = oldUrl;
+    document.getElementById('manualReplaceUrl').textContent = newUrl;
+    
+    document.getElementById('manualFixModal').classList.remove('hidden');
+}
+
+function closeManualFixModal() {
+    document.getElementById('manualFixModal').classList.add('hidden');
+    currentManualFixData = null;
+}
+
+function copyFixInstructions() {
+    if (!currentManualFixData) return;
+    
+    const instructions = `
+MANUEL LİNK DÜZELTME TALİMATLARI
+=====================================
+
+Sayfa: ${currentManualFixData.pageTitle}
+Sayfa URL: ${currentManualFixData.pageUrl}
+
+ESKİ LİNK (Redirect):
+${currentManualFixData.oldUrl}
+
+YENİ LİNK (Final URL):
+${currentManualFixData.newUrl}
+
+ADIM ADIM:
+1. WordPress Admin Paneline giriş yapın
+2. Elementor ile sayfayı düzenlemek için sayfaya gidin
+3. Elementor editöründe sayfayı açın
+4. Sayfada "${currentManualFixData.oldUrl}" linkini arayın
+5. Linki bulun ve tıklayın
+6. Link ayarlarında URL'yi "${currentManualFixData.newUrl}" ile değiştirin
+7. Değişiklikleri kaydedin ve yayınlayın
+
+İPUCU: Elementor'da Ctrl+F (veya Cmd+F Mac'te) ile arama yapabilirsiniz.
+    `.trim();
+    
+    navigator.clipboard.writeText(instructions).then(() => {
+        alert('✅ Talimatlar panoya kopyalandı!');
+    }).catch(() => {
+        // Fallback: textarea ile kopyala
+        const textarea = document.createElement('textarea');
+        textarea.value = instructions;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        alert('✅ Talimatlar panoya kopyalandı!');
+    });
+}
+
+function toggleRedirectDetail(linkId) {
+    const detailRow = document.getElementById('redirect-detail-' + linkId);
+    const arrow = document.querySelector('.redirect-arrow-' + linkId);
+    
+    if (detailRow) {
+        detailRow.classList.toggle('hidden');
+        if (arrow) {
+            if (detailRow.classList.contains('hidden')) {
+                arrow.style.transform = 'rotate(0deg)';
+            } else {
+                arrow.style.transform = 'rotate(90deg)';
+            }
+        }
+    }
+}
+
+function fixRedirectFromButton(button) {
+    const linkId = parseInt(button.getAttribute('data-link-id'));
+    const oldUrl = button.getAttribute('data-old-url') || '';
+    const newUrl = button.getAttribute('data-new-url') || '';
+    const pageId = parseInt(button.getAttribute('data-page-id'));
+    const pageUrl = button.getAttribute('data-page-url') || '';
+    const pageTitle = button.getAttribute('data-page-title') || 'Bilinmiyor';
+    
+    fixRedirect(linkId, oldUrl, newUrl, pageId, pageUrl, pageTitle);
+}
+
+function fixRedirect(linkId, oldUrl, newUrl, pageId, pageUrl, pageTitle) {
+    currentFixData = { linkId: linkId, oldUrl: oldUrl, newUrl: newUrl, pageId: pageId };
+    
+    // Elementleri kontrol et
+    const logSourcePageEl = document.getElementById('logSourcePage');
+    const logOldUrlEl = document.getElementById('logOldUrl');
+    const logNewUrlEl = document.getElementById('logNewUrl');
+    const fixLogContentEl = document.getElementById('fixLogContent');
+    const logStatusEl = document.getElementById('logStatus');
+    const logCloseBtnEl = document.getElementById('logCloseBtn');
+    const fixRedirectLogModalEl = document.getElementById('fixRedirectLogModal');
+    
+    if (!logSourcePageEl || !logOldUrlEl || !logNewUrlEl || !fixLogContentEl || !logStatusEl || !logCloseBtnEl || !fixRedirectLogModalEl) {
+        console.error('Log modal elementleri bulunamadı!');
+        alert('Log ekranı yüklenemedi. Sayfayı yenileyin.');
+        return;
+    }
+    
+    // Log modal'ı aç
+    logSourcePageEl.textContent = (pageTitle || 'Bilinmiyor') + ' (' + (pageUrl || '') + ')';
+    logOldUrlEl.textContent = oldUrl || '-';
+    logNewUrlEl.textContent = newUrl || '-';
+    fixLogContentEl.innerHTML = '<div class="text-green-400">🔄 İşlem başlatılıyor...</div>';
+    logStatusEl.textContent = 'İşleniyor...';
+    logCloseBtnEl.classList.add('hidden');
+    fixRedirectLogModalEl.classList.remove('hidden');
+    
+    // İşlemi başlat
+    startFixProcess(linkId, oldUrl, newUrl, pageId);
+}
+
+function addLog(message, type = 'info') {
+    const logContent = document.getElementById('fixLogContent');
+    const colors = {
+        'info': 'text-blue-400',
+        'success': 'text-green-400',
+        'error': 'text-red-400',
+        'warning': 'text-yellow-400'
+    };
+    const color = colors[type] || colors.info;
+    const timestamp = new Date().toLocaleTimeString('tr-TR');
+    const logDiv = document.createElement('div');
+    logDiv.className = color;
+    logDiv.textContent = '[' + timestamp + '] ' + message;
+    logContent.appendChild(logDiv);
+    // Scroll to bottom
+    logContent.scrollTop = logContent.scrollHeight;
+}
+
+function closeFixLogModal() {
+    document.getElementById('fixRedirectLogModal').classList.add('hidden');
+    currentFixData = null;
+    // localStorage'dan temizle
+    localStorage.removeItem('fixRedirectLogOpen');
+    localStorage.removeItem('fixRedirectLogLogs');
+}
+
+async function startFixProcess(linkId, oldUrl, newUrl, pageId) {
+    // Log içeriğini temizle
+    document.getElementById('fixLogContent').innerHTML = '';
+    addLog('🔄 WordPress bağlantısı kontrol ediliyor...', 'info');
+    
+    try {
+        const response = await fetch('/site-tools/fix-redirect', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                link_id: linkId,
+                old_url: oldUrl,
+                new_url: newUrl,
+                page_id: pageId,
+                dry_run: false
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Önce backend'den gelen logları göster
+        if (data.logs && Array.isArray(data.logs)) {
+            data.logs.forEach(log => {
+                addLog(log.message, log.type || 'info');
+            });
+        }
+        
+               if (data.success) {
+                   addLog('🎉 ' + data.message, 'success');
+                   document.getElementById('logStatus').innerHTML = '<span class="text-green-600 font-medium">✅ Başarılı</span>';
+                   document.getElementById('logCloseBtn').classList.remove('hidden');
+                   
+                   // Log ekranı kalıcı olsun, otomatik kapanmasın
+                   // setTimeout(() => {
+                   //     window.location.reload();
+                   // }, 3000);
+               } else {
+            addLog('❌ Hata: ' + data.message, 'error');
+            document.getElementById('logStatus').innerHTML = '<span class="text-red-600 font-medium">❌ Başarısız</span>';
+            document.getElementById('logCloseBtn').classList.remove('hidden');
+        }
+    } catch (error) {
+        addLog('❌ Bağlantı hatası: ' + error.message, 'error');
+        document.getElementById('logStatus').innerHTML = '<span class="text-red-600 font-medium">❌ Hata</span>';
+        document.getElementById('logCloseBtn').classList.remove('hidden');
+    }
+}
+
+function closeFixModal() {
+    document.getElementById('fixRedirectModal').classList.add('hidden');
+    currentFixData = null;
+}
+
+async function confirmFixRedirect() {
+    if (!currentFixData) return;
+    
+    const dryRun = document.getElementById('dryRunCheck').checked;
+    const resultDiv = document.getElementById('fixResult');
+    resultDiv.classList.remove('hidden');
+    resultDiv.innerHTML = '<p class="text-sm text-gray-600">İşleniyor...</p>';
+    
+    try {
+        const response = await fetch('/site-tools/fix-redirect', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                link_id: currentFixData.linkId,
+                old_url: currentFixData.oldUrl,
+                new_url: currentFixData.newUrl,
+                page_id: currentFixData.pageId,
+                dry_run: dryRun
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            resultDiv.className = 'mb-4 p-3 rounded bg-green-100 text-green-800';
+            resultDiv.innerHTML = '<p class="text-sm font-medium">✅ ' + data.message + '</p>';
+            if (data.changes_count > 0 && !dryRun) {
+                setTimeout(function() {
+                    window.location.reload();
+                }, 2000);
+            }
+        } else {
+            resultDiv.className = 'mb-4 p-3 rounded bg-red-100 text-red-800';
+            resultDiv.innerHTML = '<p class="text-sm font-medium">❌ ' + data.message + '</p>';
+        }
+    } catch (error) {
+        resultDiv.className = 'mb-4 p-3 rounded bg-red-100 text-red-800';
+        resultDiv.innerHTML = '<p class="text-sm font-medium">❌ Hata: ' + error.message + '</p>';
+    }
+}
+</script>
+{% endblock %}

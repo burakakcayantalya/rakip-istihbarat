@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block title %}Entity Bul - Wikipedia Entity Finder{% endblock %}
+{% block page_title %}Entity Bul{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    
+    <!-- Header -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-2xl font-semibold text-gray-800 mb-2">Wikipedia'dan Entity Bul</h2>
+        <p class="text-gray-600">Bir anahtar kelime girin veya direkt Wikipedia URL'i girin, sistem internal linklerden ilgili entity'leri otomatik bulup kategorilere ayırır.</p>
+    </div>
+    
+    <!-- Yeni Arama Formu -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Yeni Entity Arama</h3>
+        
+        <form id="searchForm" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Arama Yöntemi
+                </label>
+                <div class="flex items-center space-x-4 mb-4">
+                    <label class="flex items-center">
+                        <input type="radio" name="searchType" value="keyword" checked 
+                               class="mr-2" onchange="toggleSearchType()">
+                        <span class="text-sm">Anahtar Kelime</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="searchType" value="url" 
+                               class="mr-2" onchange="toggleSearchType()">
+                        <span class="text-sm">Wikipedia URL</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div id="keywordField">
+                <label for="keyword" class="block text-sm font-medium text-gray-700 mb-2">
+                    Anahtar Kelime
+                </label>
+                <input type="text" 
+                       id="keyword" 
+                       name="keyword" 
+                       placeholder="Örn: dentistry, dental implant, veneers"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                <p class="mt-1 text-sm text-gray-500">Wikipedia'da bu sayfaya gidilecek ve internal linklerden entity'ler bulunacak</p>
+            </div>
+            
+            <div id="urlField" style="display: none;">
+                <label for="wikipedia_url" class="block text-sm font-medium text-gray-700 mb-2">
+                    Wikipedia URL
+                </label>
+                <input type="url" 
+                       id="wikipedia_url" 
+                       name="wikipedia_url" 
+                       placeholder="https://en.wikipedia.org/wiki/Dentistry"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                <p class="mt-1 text-sm text-gray-500">Direkt Wikipedia sayfası URL'i. Sistem bu sayfadan internal linkleri çıkaracak</p>
+            </div>
+            
+            <div>
+                <label for="max_links" class="block text-sm font-medium text-gray-700 mb-2">
+                    Maksimum Link Sayısı
+                </label>
+                <input type="number" 
+                       id="max_links" 
+                       name="max_links" 
+                       value="100"
+                       min="10"
+                       max="500"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                <p class="mt-1 text-sm text-gray-500">Kontrol edilecek maksimum internal link sayısı (10-500 arası)</p>
+            </div>
+            
+            <button type="submit" 
+                    class="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium">
+                Entity Ara
+            </button>
+        </form>
+    </div>
+    
+    <!-- Önceki Aramalar -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Önceki Aramalar</h3>
+        
+        {% if searches %}
+        <div class="space-y-3">
+            {% for search in searches %}
+            <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-indigo-300 transition-colors">
+                <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <h4 class="font-semibold text-gray-800">{{ search.keyword }}</h4>
+                            {% if search.status == "processing" %}
+                            <span class="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full flex items-center space-x-2">
+                                <svg class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span>İşleniyor...</span>
+                            </span>
+                            {% elif search.status == "completed" %}
+                            <span class="px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">Tamamlandı</span>
+                            {% elif search.status == "error" %}
+                            <span class="px-3 py-1 bg-red-100 text-red-800 text-xs font-medium rounded-full">Hata</span>
+                            {% else %}
+                            <span class="px-3 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded-full">Beklemede</span>
+                            {% endif %}
+                        </div>
+                        <div class="flex items-center space-x-4 text-sm text-gray-600">
+                            <span>📊 {{ search.total_links_found }} link bulundu</span>
+                            <span>🔍 {{ search.total_entities_found }} entity bulundu</span>
+                            <span>📅 {{ search.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        {% if search.status == "completed" %}
+                        <a href="/entity-finder/search/{{ search.id }}" 
+                           class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm">
+                            Detayları Gör
+                        </a>
+                        {% endif %}
+                        <button onclick="deleteSearch({{ search.id }})" 
+                                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm">
+                            Sil
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-500 text-center py-8">Henüz arama yapılmamış</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+    
+    // Search type toggle
+    window.toggleSearchType = function() {
+        const searchType = document.querySelector('input[name="searchType"]:checked').value;
+        const keywordField = document.getElementById('keywordField');
+        const urlField = document.getElementById('urlField');
+        const keywordInput = document.getElementById('keyword');
+        const urlInput = document.getElementById('wikipedia_url');
+        
+        if (searchType === 'keyword') {
+            keywordField.style.display = 'block';
+            urlField.style.display = 'none';
+            keywordInput.required = true;
+            urlInput.required = false;
+            urlInput.value = '';
+        } else {
+            keywordField.style.display = 'none';
+            urlField.style.display = 'block';
+            keywordInput.required = false;
+            urlInput.required = true;
+            keywordInput.value = '';
+        }
+    };
+    
+    // Form submit
+    document.getElementById('searchForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const searchType = document.querySelector('input[name="searchType"]:checked').value;
+        const keyword = document.getElementById('keyword').value.trim();
+        const wikipedia_url = document.getElementById('wikipedia_url').value.trim();
+        const maxLinks = parseInt(document.getElementById('max_links').value) || 100;
+        
+        if (searchType === 'keyword' && !keyword) {
+            alert('Lütfen bir anahtar kelime girin');
+            return;
+        }
+        
+        if (searchType === 'url' && !wikipedia_url) {
+            alert('Lütfen bir Wikipedia URL girin');
+            return;
+        }
+        
+        if (searchType === 'url' && !wikipedia_url.includes('wikipedia.org')) {
+            alert('Lütfen geçerli bir Wikipedia URL girin (örn: https://en.wikipedia.org/wiki/Dentistry)');
+            return;
+        }
+        
+        try {
+            const requestData = {
+                max_links: maxLinks,
+                use_contextual: false  // Standart mod varsayılan
+            };
+            
+            if (searchType === 'keyword') {
+                requestData.keyword = keyword;
+            } else {
+                requestData.wikipedia_url = wikipedia_url;
+            }
+            
+            const response = await fetch('/entity-finder/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+            
+            const data = await response.json();
+            
+            if (data.status === 'started') {
+                alert(data.message);
+                window.location.reload();
+            } else {
+                alert('Hata: ' + data.message);
+            }
+        } catch (error) {
+            alert('Hata: ' + error.message);
+        }
+    });
+    
+    // Delete search
+    window.deleteSearch = function(searchId) {
+        if (!confirm('Bu aramayı silmek istediğinize emin misiniz?')) {
+            return;
+        }
+        
+        fetch('/entity-finder/search/' + searchId, {
+            method: 'DELETE'
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                window.location.reload();
+            } else {
+                alert('Hata: ' + data.message);
+            }
+        })
+        .catch(function(error) {
+            alert('Hata: ' + error.message);
+        });
+    };
+    
+    // Otomatik yenileme (işleniyor durumunda)
+    const processingSearches = document.querySelectorAll('[class*="bg-yellow-100"]');
+    if (processingSearches.length > 0) {
+        setTimeout(function() {
+            window.location.reload();
+        }, 10000);
+    }
+})();
+</script>
+{% endblock %}
+

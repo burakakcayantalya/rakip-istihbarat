@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}AI Helper - Internal Linking Agent{% endblock %}
+{% block page_title %}AI Helper{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="{ 
+    selectedSiteId: null,
+    projectName: '',
+    aiProvider: 'gemini',
+    aiModel: 'gemini-flash-latest',
+    creating: false,
+    updateModelOptions: function() {
+        // Provider değiştiğinde model'i güncelle
+        if (this.aiProvider === 'gemini') {
+            this.aiModel = 'gemini-flash-latest';
+        } else if (this.aiProvider === 'deepseek') {
+            this.aiModel = 'deepseek-chat';
+        }
+    },
+    createProject: function() {
+        if (!this.selectedSiteId) {
+            alert('Lütfen bir site seçin');
+            return;
+        }
+        
+        if (this.creating) {
+            return;
+        }
+        
+        this.creating = true;
+        
+        fetch('/ai-helper/project/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                site_id: parseInt(this.selectedSiteId),
+                project_name: this.projectName,
+                ai_provider: this.aiProvider,
+                ai_model: this.aiModel
+            })
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                alert(data.message);
+                window.location.href = '/ai-helper/project/' + data.project_id;
+            } else {
+                alert('Hata: ' + data.message);
+                this.creating = false;
+            }
+        }.bind(this))
+        .catch(function(error) {
+            alert('Hata: ' + error.message);
+            this.creating = false;
+        }.bind(this));
+    }
+}">
+    
+    <!-- Header -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-2xl font-semibold text-gray-800 mb-2">AI Helper - Internal Linking Agent</h2>
+        <p class="text-gray-600">WordPress siteniz için otomatik internal linking önerileri oluşturun. AI destekli semantic analiz ile içeriklerinize doğal linkler ekleyin.</p>
+    </div>
+    
+    <!-- Yeni Proje Oluştur -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Yeni Proje Oluştur</h3>
+        
+        <form @submit.prevent="createProject()" class="space-y-4">
+            <div>
+                <label for="site_select" class="block text-sm font-medium text-gray-700 mb-2">
+                    Site Seçin
+                </label>
+                <select id="site_select" 
+                        x-model="selectedSiteId"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                    <option value="">-- Site Seçin --</option>
+                    {% for site in sites %}
+                    <option value="{{ site.id }}">{{ site.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div>
+                <label for="project_name" class="block text-sm font-medium text-gray-700 mb-2">
+                    Proje Adı (Opsiyonel)
+                </label>
+                <input type="text" 
+                       id="project_name"
+                       x-model="projectName"
+                       placeholder="Proje adı (boş bırakılırsa site adı kullanılır)"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            </div>
+            
+            <div>
+                <label for="ai_provider" class="block text-sm font-medium text-gray-700 mb-2">
+                    AI Provider
+                </label>
+                <select id="ai_provider" 
+                        x-model="aiProvider"
+                        @change="updateModelOptions()"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                    <option value="gemini">Gemini AI</option>
+                    <option value="deepseek">Deepseek AI</option>
+                </select>
+            </div>
+            
+            <div>
+                <label for="ai_model" class="block text-sm font-medium text-gray-700 mb-2">
+                    AI Modeli
+                </label>
+                <select id="ai_model" 
+                        x-model="aiModel"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                    <option value="gemini-flash-latest" x-show="aiProvider === 'gemini'">Gemini Flash Latest</option>
+                    <option value="gemini-pro" x-show="aiProvider === 'gemini'">Gemini Pro</option>
+                    <option value="deepseek-chat" x-show="aiProvider === 'deepseek'">Deepseek Chat</option>
+                </select>
+                <p class="mt-1 text-xs text-gray-500">AI provider ve model seçimi clustering ve gap analizi için kullanılacak</p>
+            </div>
+            
+            <button type="submit" 
+                    :disabled="!selectedSiteId || creating"
+                    class="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                <span x-show="!creating">Proje Oluştur ve Analiz Başlat</span>
+                <span x-show="creating">Oluşturuluyor...</span>
+            </button>
+        </form>
+    </div>
+    
+    <!-- Mevcut Projeler -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Mevcut Projeler</h3>
+        
+        {% if projects %}
+        <div class="space-y-3">
+            {% for project in projects %}
+            <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-indigo-300 transition-colors">
+                <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <h4 class="font-semibold text-gray-800">{{ project.project_name }}</h4>
+                            {% if project.status == "active" %}
+                            <span class="px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">Aktif</span>
+                            {% elif project.status == "paused" %}
+                            <span class="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">Duraklatıldı</span>
+                            {% else %}
+                            <span class="px-3 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded-full">{{ project.status }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="flex items-center space-x-4 text-sm text-gray-600">
+                            <span>📅 {{ project.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <a href="/ai-helper/project/{{ project.id }}" 
+                           class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm">
+                            Dashboard'a Git
+                        </a>
+                        <button onclick="deleteProject({{ project.id }}, '{{ project.project_name }}')" 
+                                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm">
+                            Sil
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-500 text-center py-8">Henüz proje oluşturulmamış</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+    
+    window.deleteProject = function(projectId, projectName) {
+        if (!confirm('Bu projeyi silmek istediğinize emin misiniz? "' + projectName + '"\n\nBu işlem geri alınamaz ve tüm veriler silinecektir.')) {
+            return;
+        }
+        
+        fetch('/ai-helper/project/' + projectId, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                alert(data.message);
+                window.location.reload();
+            } else {
+                alert('Hata: ' + data.message);
+            }
+        })
+        .catch(function(error) {
+            alert('Hata: ' + error.message);
+        });
+    };
+})();
+</script>
+{% endblock %}
+

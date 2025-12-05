@@ -1,0 +1,410 @@
+{% extends "base.html" %}
+
+{% block title %}Reviewer Agent - Dashboard{% endblock %}
+
+{% block page_title %}Reviewer Agent - Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900">Reviewer Agent</h2>
+                <p class="text-gray-600 mt-1">Observer'dan gelen raporları önceliklendirip kuyruğa ekler</p>
+            </div>
+            <button onclick="processReports()" 
+                    class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                🔄 Observer Raporlarını İşle
+            </button>
+        </div>
+    </div>
+    
+    <!-- İstatistikler -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Bekleyenler -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Bekleyenler</h3>
+                <svg class="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-yellow-600">{{ total_pending }}</div>
+            <p class="text-sm text-gray-500 mt-2">Öncelik sırasına göre bekleyen işlemler</p>
+        </div>
+        
+        <!-- İşlenmekte -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">İşlenmekte</h3>
+                <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-blue-600">{{ total_in_progress }}</div>
+            <p class="text-sm text-gray-500 mt-2">Şu anda işlenen işlemler</p>
+        </div>
+        
+        <!-- Tamamlananlar -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Tamamlananlar</h3>
+                <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-green-600">{{ total_completed }}</div>
+            <p class="text-sm text-gray-500 mt-2">Tamamlanmış işlemler</p>
+        </div>
+    </div>
+    
+    <!-- Tabs: Bekleyenler / Tamamlanamayan Görevler -->
+    <div class="bg-white rounded-lg shadow">
+        <!-- Tab Headers -->
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex">
+                <button onclick="switchTab('pending')"
+                        id="tab-pending"
+                        class="tab-button active w-1/2 py-4 px-6 text-center border-b-2 font-medium text-sm">
+                    Bekleyen İşlemler
+                </button>
+                <button onclick="switchTab('failed')"
+                        id="tab-failed"
+                        class="tab-button w-1/2 py-4 px-6 text-center border-b-2 font-medium text-sm">
+                    Tamamlanamayan Görevler
+                </button>
+            </nav>
+        </div>
+
+        <!-- Tab Content: Bekleyenler -->
+        <div id="content-pending" class="tab-content p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Bekleyen İşlemler (Öncelik Sırasına Göre)</h3>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Öncelik</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kural</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Severity</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sayfa</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aksiyon</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% if pending_items %}
+                        {% for item in pending_items %}
+                        <tr>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full
+                                    {% if item.priority_score == 5 %}bg-red-100 text-red-800
+                                    {% elif item.priority_score == 4 %}bg-orange-100 text-orange-800
+                                    {% elif item.priority_score == 3 %}bg-yellow-100 text-yellow-800
+                                    {% elif item.priority_score == 2 %}bg-blue-100 text-blue-800
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {{ item.priority_score }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ item.rule_name }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full
+                                    {% if item.severity == 'ERROR' %}bg-red-100 text-red-800
+                                    {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                    {{ item.severity }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-500">
+                                {% if item.page_url %}
+                                <a href="{{ item.page_url }}" target="_blank" class="text-indigo-600 hover:underline">
+                                    {{ item.page_url[:50] }}{% if item.page_url|length > 50 %}...{% endif %}
+                                </a>
+                                {% else %}
+                                <span class="text-gray-400">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-900 max-w-xs">
+                                <div class="truncate" title="{{ item.action_plan }}">
+                                    {{ item.action_plan[:60] }}{% if item.action_plan and item.action_plan|length > 60 %}...{% endif %}
+                                </div>
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm">
+                                <button onclick="startItem({{ item.id }})" 
+                                        class="text-indigo-600 hover:text-indigo-900 mr-2">
+                                    ▶️ Başlat
+                                </button>
+                                <button onclick="skipItem({{ item.id }})" 
+                                        class="text-gray-600 hover:text-gray-900">
+                                    ⏭️ Atla
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="px-4 py-3 text-center text-sm text-gray-500">Bekleyen işlem yok</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        </div>
+
+        <!-- Tab Content: Tamamlanamayan Görevler -->
+        <div id="content-failed" class="tab-content p-6 hidden">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Tamamlanamayan Görevler (Controller Retry)</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sayfa URL</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Görev Tipi</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Deneme Sayısı</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dispatcher Durumu</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reviewer Durumu</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Doğrulama Tarihi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="failed-tasks-body" class="bg-white divide-y divide-gray-200">
+                        <tr>
+                            <td colspan="6" class="px-4 py-3 text-center text-sm text-gray-500">Yükleniyor...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- İşlenmekte Olanlar -->
+    {% if in_progress_items %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">İşlenmekte Olanlar</h3>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kural</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sayfa</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Başlangıç</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for item in in_progress_items %}
+                    <tr>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ item.rule_name }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500">
+                            {% if item.page_url %}
+                            <a href="{{ item.page_url }}" target="_blank" class="text-indigo-600 hover:underline">
+                                {{ item.page_url[:50] }}{% if item.page_url|length > 50 %}...{% endif %}
+                            </a>
+                            {% else %}
+                            <span class="text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {{ item.started_at.strftime('%d.%m.%Y %H:%M') if item.started_at else '-' }}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm">
+                            <button onclick="completeItem({{ item.id }})" 
+                                    class="text-green-600 hover:text-green-900">
+                                ✅ Tamamla
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Tab switching
+function switchTab(tabName) {
+    // Hide all tab contents
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.add('hidden');
+    });
+
+    // Remove active class from all buttons
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.classList.remove('active', 'border-indigo-500', 'text-indigo-600');
+        button.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+    });
+
+    // Show selected tab content
+    document.getElementById('content-' + tabName).classList.remove('hidden');
+
+    // Add active class to selected button
+    const activeButton = document.getElementById('tab-' + tabName);
+    activeButton.classList.add('active', 'border-indigo-500', 'text-indigo-600');
+    activeButton.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+
+    // Load failed tasks if switching to that tab
+    if (tabName === 'failed') {
+        loadFailedTasks();
+    }
+}
+
+// Load Failed Tasks
+async function loadFailedTasks() {
+    try {
+        const response = await fetch('/agents/reviewer/api/failed-tasks?limit=50');
+        const data = await response.json();
+
+        const tbody = document.getElementById('failed-tasks-body');
+
+        if (data.status === 'success' && data.failed_tasks.length > 0) {
+            tbody.innerHTML = data.failed_tasks.map(task => `
+                <tr>
+                    <td class="px-4 py-3 text-sm text-gray-900">
+                        <a href="${task.page_url}" target="_blank" class="text-indigo-600 hover:underline">
+                            ${task.page_url.substring(0, 50)}${task.page_url.length > 50 ? '...' : ''}
+                        </a>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${task.task_type}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-center">${task.retry_count}</td>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                        ${task.retry_task ? `
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full ${
+                                task.retry_task.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                                task.retry_task.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
+                                'bg-yellow-100 text-yellow-800'
+                            }">
+                                ${task.retry_task.status}
+                            </span>
+                        ` : '<span class="text-gray-400">-</span>'}
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                        ${task.reviewer_item ? `
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full ${
+                                task.reviewer_item.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                                task.reviewer_item.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
+                                'bg-yellow-100 text-yellow-800'
+                            }">
+                                ${task.reviewer_item.status} (P${task.reviewer_item.priority_score})
+                            </span>
+                        ` : '<span class="text-gray-400">Kuyrukta Değil</span>'}
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                        ${task.verification_completed_at ? new Date(task.verification_completed_at).toLocaleString('tr-TR') : '-'}
+                    </td>
+                </tr>
+            `).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-3 text-center text-sm text-gray-500">Tamamlanamayan görev bulunamadı</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error loading failed tasks:', error);
+        document.getElementById('failed-tasks-body').innerHTML =
+            '<tr><td colspan="6" class="px-4 py-3 text-center text-sm text-red-500">Yükleme hatası: ' + error.message + '</td></tr>';
+    }
+}
+
+async function processReports() {
+    if (!confirm('Observer raporlarını işleyip kuyruğa eklemek istediğinize emin misiniz?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/agents/reviewer/api/process-observer-reports', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            alert(`✅ ${result.count} rapor kuyruğa eklendi!`);
+            window.location.reload();
+        } else {
+            alert('❌ Hata: ' + (result.message || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Bir hata oluştu');
+    }
+}
+
+async function startItem(itemId) {
+    try {
+        const response = await fetch(`/agents/reviewer/api/queue/${itemId}/start`, {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            window.location.reload();
+        } else {
+            alert('Hata: ' + (result.message || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Bir hata oluştu');
+    }
+}
+
+async function completeItem(itemId) {
+    const notes = prompt('Notlar (opsiyonel):');
+    
+    try {
+        const response = await fetch(`/agents/reviewer/api/queue/${itemId}/complete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ notes: notes || null })
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            window.location.reload();
+        } else {
+            alert('Hata: ' + (result.message || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Bir hata oluştu');
+    }
+}
+
+async function skipItem(itemId) {
+    const notes = prompt('Atlama nedeni (opsiyonel):');
+    
+    try {
+        const response = await fetch(`/agents/reviewer/api/queue/${itemId}/skip`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ notes: notes || null })
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            window.location.reload();
+        } else {
+            alert('Hata: ' + (result.message || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Bir hata oluştu');
+    }
+}
+</script>
+{% endblock %}
+
+
+
+
+

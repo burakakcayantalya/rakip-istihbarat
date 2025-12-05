@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}Kuyruk - Arka Plan Görevleri{% endblock %}
+{% block page_title %}Kuyruk - Arka Plan Görevleri{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="queueData()" x-init="init()" x-on:destroy="destroy()">
+    <!-- Header -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-xl font-semibold text-gray-800 mb-2">Arka Plan Görevleri</h2>
+                <p class="text-sm text-gray-600">Çalışan ve bekleyen tüm görevleri görüntüleyin ve yönetin</p>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button @click="loadTasks()" 
+                        class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                    🔄 Yenile
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Periyodik Görevler (Scheduled Jobs) -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">⏰ Periyodik Görevler</h3>
+        
+        <div x-show="schedulerJobs.length === 0" class="text-center py-8 text-gray-500">
+            <p>Periyodik görev bulunmuyor</p>
+        </div>
+        
+        <div x-show="schedulerJobs.length > 0" class="space-y-3">
+            <template x-for="job in schedulerJobs" :key="job.id">
+                <div class="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-2 mb-2">
+                                <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                                    Periyodik
+                                </span>
+                                <span class="text-sm font-semibold text-gray-800" x-text="job.name"></span>
+                            </div>
+                            <div x-show="job.next_run_time" class="text-xs text-gray-600">
+                                Sonraki Çalışma: <span class="font-medium" x-text="job.next_run_time"></span>
+                            </div>
+                            <div x-show="job.trigger" class="text-xs text-gray-500 mt-1">
+                                Trigger: <span x-text="job.trigger"></span>
+                            </div>
+                        </div>
+                        <button @click="cancelTask(job.id)" 
+                                class="px-3 py-1.5 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors ml-4">
+                            ⛔ Sonlandır
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+    
+    <!-- Çalışan Taramalar -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">🔄 Çalışan Taramalar</h3>
+        
+        <div x-show="runningScans.length === 0" class="text-center py-8 text-gray-500">
+            <p>Şu anda çalışan tarama yok</p>
+        </div>
+        
+        <div x-show="runningScans.length > 0" class="space-y-3">
+            <template x-for="scan in runningScans" :key="scan.id">
+                <div class="p-4 border border-green-200 bg-green-50 rounded-lg">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-2 mb-2">
+                                <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">
+                                    Çalışıyor
+                                </span>
+                                <span class="text-sm font-semibold text-gray-800" x-text="scan.name"></span>
+                            </div>
+                            <div class="text-xs text-gray-600 mb-2">
+                                <span x-text="scan.scanned_pages"></span> / <span x-text="scan.total_pages"></span> sayfa taranıyor
+                            </div>
+                            <!-- Progress Bar -->
+                            <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+                                <div class="bg-green-600 h-2 rounded-full transition-all duration-300 text-white text-xs flex items-center justify-center" 
+                                     :style="'width: ' + scan.progress + '%'"
+                                     x-text="scan.progress.toFixed(1) + '%'"></div>
+                            </div>
+                            <div class="text-xs text-gray-500" x-show="scan.started_at">
+                                Başlangıç: <span x-text="new Date(scan.started_at).toLocaleString('tr-TR')"></span>
+                            </div>
+                        </div>
+                        <button @click="cancelTask(scan.id)" 
+                                class="px-3 py-1.5 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors ml-4">
+                            ⛔ Sonlandır
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+    
+    <!-- Bekleyen Taramalar -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">⏳ Bekleyen Taramalar</h3>
+        
+        <div x-show="pendingScans.length === 0" class="text-center py-8 text-gray-500">
+            <p>Bekleyen tarama yok</p>
+        </div>
+        
+        <div x-show="pendingScans.length > 0" class="space-y-3">
+            <template x-for="scan in pendingScans" :key="scan.id">
+                <div class="p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-2 mb-2">
+                                <span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded">
+                                    Bekliyor
+                                </span>
+                                <span class="text-sm font-semibold text-gray-800" x-text="scan.name"></span>
+                            </div>
+                            <div class="text-xs text-gray-500" x-show="scan.created_at">
+                                Oluşturulma: <span x-text="new Date(scan.created_at).toLocaleString('tr-TR')"></span>
+                            </div>
+                        </div>
+                        <button @click="cancelTask(scan.id)" 
+                                class="px-3 py-1.5 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors ml-4">
+                            ⛔ İptal Et
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+</div>
+
+<script>
+function queueData() {
+    return {
+        schedulerJobs: {{ scheduler_jobs|tojson }},
+        runningScans: {{ running_scans|tojson }},
+        pendingScans: {{ pending_scans|tojson }},
+        autoRefresh: true,
+        refreshInterval: null,
+        init: function() {
+            var self = this;
+            if (this.autoRefresh) {
+                this.refreshInterval = setInterval(function() {
+                    self.loadTasks();
+                }, 3000); // Her 3 saniyede bir yenile
+            }
+        },
+        destroy: function() {
+            if (this.refreshInterval) {
+                clearInterval(this.refreshInterval);
+            }
+        },
+        loadTasks: async function() {
+            var self = this;
+            try {
+                const response = await fetch('/queue/api/tasks');
+                const data = await response.json();
+                if (data.status === 'success') {
+                    self.schedulerJobs = data.scheduler_jobs || [];
+                    self.runningScans = data.running_scans || [];
+                    self.pendingScans = data.pending_scans || [];
+                }
+            } catch (error) {
+                console.error('Görevler yüklenirken hata:', error);
+            }
+        },
+        cancelTask: async function(taskId) {
+            var self = this;
+            if (!confirm('Bu görevi sonlandırmak istediğinizden emin misiniz?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/queue/task/' + taskId + '/cancel', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    showToast(data.message, 'success');
+                    // Görevleri yenile
+                    setTimeout(function() {
+                        self.loadTasks();
+                    }, 1000);
+                } else {
+                    showToast(data.message || 'Görev sonlandırılamadı', 'error');
+                }
+            } catch (error) {
+                showToast('Görev sonlandırılırken hata oluştu', 'error');
+                console.error('Hata:', error);
+            }
+        }
+    };
+}
+
+function showToast(message, type) {
+    type = type || 'info';
+    const toast = document.createElement('div');
+    var bgColor = 'bg-blue-500';
+    if (type === 'success') {
+        bgColor = 'bg-green-500';
+    } else if (type === 'error') {
+        bgColor = 'bg-red-500';
+    }
+    toast.className = 'fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg z-50 text-white ' + bgColor;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(function() {
+        toast.remove();
+    }, 3000);
+}
+</script>
+{% endblock %}

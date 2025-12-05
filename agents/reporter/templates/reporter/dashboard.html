@@ -1,0 +1,562 @@
+{% extends "base.html" %}
+
+{% block title %}Reporter Agent - Görev Hikayeleri{% endblock %}
+
+{% block page_title %}Reporter Agent - Görev Hikayeleri{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900">Görev Hikayeleri</h2>
+                <p class="text-gray-600 mt-1">Tüm agent'ların çalışmalarını baştan sona izleyin</p>
+            </div>
+            <div class="flex items-center space-x-4">
+                <input type="text" id="searchInput" placeholder="Ara..."
+                       class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                <button onclick="searchStories()"
+                        class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                    Ara
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- İstatistikler -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Parent Task'lar</h3>
+                <svg class="w-8 h-8 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-indigo-600">{{ total_parents }}</div>
+            <p class="text-sm text-gray-500 mt-2">Tarama/Denetim görevleri</p>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Child Task'lar</h3>
+                <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-green-600">{{ total_children }}</div>
+            <p class="text-sm text-gray-500 mt-2">Düzeltme görevleri</p>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Toplam Task</h3>
+                <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-blue-600">{{ total_tasks }}</div>
+            <p class="text-sm text-gray-500 mt-2">Tüm görevler</p>
+        </div>
+    </div>
+
+    <!-- Parent-Child Task Listesi (Accordion) -->
+    <div class="bg-white rounded-lg shadow p-6" x-data="{ openItems: [] }">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Parent Task'lar ve Child Task'ları</h3>
+        
+        <div class="space-y-4">
+            {% for item in parent_tasks %}
+            {% set parent_id = item.parent.id %}
+            <div class="border border-gray-200 rounded-lg overflow-hidden">
+                <!-- Parent Task Header -->
+                <div class="bg-gray-50 p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                     @click="openItems.includes({{ parent_id }}) ? openItems = openItems.filter(id => id !== {{ parent_id }}) : openItems.push({{ parent_id }})">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <svg class="w-5 h-5 text-gray-500 transition-transform"
+                                 :class="openItems.includes({{ parent_id }}) ? 'rotate-90' : ''"
+                                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                            <div>
+                                <div class="font-semibold text-gray-900">
+                                    {{ item.parent.task_type }} - ID: {{ item.parent.id }}
+                                </div>
+                                <div class="text-sm text-gray-600">
+                                    {{ item.parent.task_description or 'Açıklama yok' }}
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    {{ item.parent.created_at.strftime('%Y-%m-%d %H:%M:%S') if item.parent.created_at else 'Tarih yok' }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <!-- Status Badge -->
+                            {% if item.parent.status.value == 'COMPLETED' %}
+                            <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                {{ item.parent.status.value }}
+                            </span>
+                            {% elif item.parent.status.value == 'FAILED' %}
+                            <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                                {{ item.parent.status.value }}
+                            </span>
+                            {% elif item.parent.status.value == 'IN_PROGRESS' %}
+                            <span class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                                {{ item.parent.status.value }}
+                                </span>
+                            {% else %}
+                            <span class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+                                {{ item.parent.status.value }}
+                            </span>
+                            {% endif %}
+                            <!-- Child Stats -->
+                            <div class="text-sm text-gray-600">
+                                <span class="font-semibold">{{ item.children_stats.total }}</span> child task
+                                {% if item.children_stats.completed > 0 %}
+                                <span class="text-green-600">{{ item.children_stats.completed }} ✓</span>
+                                {% endif %}
+                                {% if item.children_stats.failed > 0 %}
+                                <span class="text-red-600">{{ item.children_stats.failed }} ✗</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Child Tasks (Accordion Content) -->
+                <div x-show="openItems.includes({{ parent_id }})" 
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 transform scale-95"
+                     x-transition:enter-end="opacity-100 transform scale-100"
+                     class="border-t border-gray-200">
+                    {% if item.children %}
+                    <div class="divide-y divide-gray-100">
+                        {% for child in item.children %}
+                        <div class="p-4 hover:bg-gray-50 transition-colors">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-xs text-gray-400">└─</span>
+                                        <div>
+                                            <div class="font-medium text-gray-900">
+                                                {{ child.task_type }} - ID: {{ child.id }}
+                                            </div>
+                                            <div class="text-sm text-gray-600">
+                                                {{ child.task_description or 'Açıklama yok' }}
+                                            </div>
+                                            {% if child.page_url %}
+                                            <div class="text-xs text-gray-500 mt-1">
+                                                URL: <a href="{{ child.page_url }}" target="_blank" class="text-indigo-600 hover:underline">{{ child.page_url[:60] }}{% if child.page_url|length > 60 %}...{% endif %}</a>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <!-- Status Badge -->
+                                    {% if child.status.value == 'COMPLETED' %}
+                                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                        {{ child.status.value }}
+                                    </span>
+                                    {% elif child.status.value == 'FAILED' %}
+                                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                                        {{ child.status.value }}
+                                    </span>
+                                    {% elif child.status.value == 'IN_PROGRESS' %}
+                                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                                        {{ child.status.value }}
+                                    </span>
+                                    {% else %}
+                                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+                                        {{ child.status.value }}
+                                    </span>
+                                    {% endif %}
+                                    <!-- View Story Link -->
+                                    {% if child.controller_task_id %}
+                                    <a href="/agents/reporter/story/{{ child.controller_task_id }}" 
+                                       class="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                                        Hikayeyi Gör
+                            </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="p-4 text-sm text-gray-500 text-center">
+                        Bu parent task için henüz child task oluşturulmamış.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+                    {% endfor %}
+        </div>
+        
+        {% if not parent_tasks %}
+        <div class="text-center py-8 text-gray-500">
+            Henüz parent task bulunmuyor.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Canlı Log Ekranı -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Canlı Log Ekranı</h3>
+            <div class="flex items-center gap-3">
+                <select id="logLevelFilter" class="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500">
+                    <option value="ALL">Tüm Seviyeler</option>
+                    <option value="DEBUG">DEBUG</option>
+                    <option value="INFO">INFO</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="ERROR">ERROR</option>
+                    <option value="SUCCESS">SUCCESS</option>
+                </select>
+                <select id="logAgentFilter" class="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500">
+                    <option value="ALL">Tüm Agentlar</option>
+                    <option value="CONTROLLER">Controller</option>
+                    <option value="DISPATCHER">Dispatcher</option>
+                    <option value="FIXER">Link Fixer</option>
+                    <option value="AI_HELPER">AI Helper</option>
+                    <option value="OBSERVER">Observer</option>
+                    <option value="REVIEWER">Reviewer</option>
+                </select>
+                <button onclick="clearSelectedLogs()" class="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700">
+                    Seçilenleri Sil
+                </button>
+                <button onclick="clearAllLogs()" class="px-3 py-1.5 text-sm bg-red-800 text-white rounded-md hover:bg-red-900 font-semibold">
+                    Tüm Logları Sil
+                </button>
+                <button onclick="toggleAutoRefresh()" id="autoRefreshBtn" class="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                    Auto-Refresh: Açık
+                </button>
+            </div>
+        </div>
+        
+        <div id="logContainer" class="bg-gray-900 text-gray-100 rounded-lg p-4 h-96 overflow-y-auto font-mono text-sm">
+            <div class="text-gray-500 text-center py-8">Loglar yükleniyor...</div>
+        </div>
+        
+        <div class="mt-2 flex items-center justify-between text-xs text-gray-500">
+            <span id="logCount">0 log</span>
+            <span id="lastUpdate">-</span>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// Log yönetimi
+let selectedLogIds = new Set();
+let autoRefreshInterval = null;
+let autoRefreshEnabled = true;
+
+function searchStories() {
+    const query = document.getElementById('searchInput').value;
+    if (query) {
+        window.location.href = `/agents/reporter/?q=${encodeURIComponent(query)}`;
+    }
+}
+
+// Enter tuşu ile arama
+document.getElementById('searchInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        searchStories();
+    }
+});
+
+// Log fonksiyonları
+async function loadLogs() {
+    try {
+        const level = document.getElementById('logLevelFilter').value;
+        const agent = document.getElementById('logAgentFilter').value;
+        
+        const params = new URLSearchParams({
+            level: level,
+            source_agent: agent,
+            limit: 200,
+            since_minutes: 60
+        });
+        
+        const response = await fetch(`/agents/reporter/api/logs?${params}`);
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            // Task grupları varsa onları kullan, yoksa eski formatı kullan
+            if (data.task_groups) {
+                renderLogs(data.logs, data.task_groups);
+            } else {
+                renderLogs(data.logs);
+            }
+            document.getElementById('logCount').textContent = `${data.count} log`;
+            document.getElementById('lastUpdate').textContent = `Son güncelleme: ${new Date().toLocaleTimeString('tr-TR')}`;
+        }
+    } catch (error) {
+        console.error('Log yükleme hatası:', error);
+    }
+}
+
+function renderLogs(logs, taskGroups = null) {
+    const container = document.getElementById('logContainer');
+    
+    // Eğer taskGroups varsa, gruplandırılmış gösterim kullan
+    if (taskGroups && taskGroups.length > 0) {
+        container.innerHTML = taskGroups.map(group => {
+            const taskId = group.task_id || 'N/A';
+            const taskType = group.task_type || 'N/A';
+            const taskStatus = group.task_status || 'N/A';
+            const logCount = group.log_count || 0;
+            
+            // Status renkleri
+            const statusColors = {
+                'COMPLETED': 'text-green-400',
+                'FAILED': 'text-red-400',
+                'IN_PROGRESS': 'text-blue-400',
+                'PENDING': 'text-yellow-400'
+            };
+            const statusColor = statusColors[taskStatus] || 'text-gray-400';
+            
+            const logsHtml = group.logs.map(log => {
+                const levelColors = {
+                    'DEBUG': 'text-gray-400',
+                    'INFO': 'text-blue-400',
+                    'WARNING': 'text-yellow-400',
+                    'ERROR': 'text-red-400',
+                    'SUCCESS': 'text-green-400'
+                };
+                
+                const levelColor = levelColors[log.level] || 'text-gray-300';
+                const timestamp = new Date(log.created_at).toLocaleTimeString('tr-TR');
+                const isSelected = selectedLogIds.has(log.id);
+                
+                return `
+                    <div class="flex items-start gap-2 py-1 hover:bg-gray-800 rounded px-2 ml-4 ${isSelected ? 'bg-gray-800' : ''}" data-log-id="${log.id}">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleLogSelection(${log.id})" class="mt-1">
+                        <span class="text-gray-500 text-xs w-20">${timestamp}</span>
+                        <span class="${levelColor} font-semibold w-20">[${log.level}]</span>
+                        <span class="text-blue-300 w-24">${log.source_agent}</span>
+                        ${log.target_agent ? `<span class="text-gray-400">→</span><span class="text-purple-300 w-24">${log.target_agent}</span>` : ''}
+                        <span class="flex-1">${escapeHtml(log.message)}</span>
+                        <button onclick="deleteLog(${log.id})" class="text-red-400 hover:text-red-300 px-2">✕</button>
+                    </div>
+                `;
+            }).join('');
+            
+            return `
+                <div class="mb-4 border-b border-gray-700 pb-2">
+                    <div class="flex items-center gap-3 mb-2 px-2">
+                        <span class="text-cyan-400 font-bold text-sm">Task ID: ${taskId}</span>
+                        <span class="text-gray-400 text-xs">|</span>
+                        <span class="text-yellow-300 text-xs">${taskType}</span>
+                        <span class="text-gray-400 text-xs">|</span>
+                        <span class="${statusColor} text-xs">${taskStatus}</span>
+                        <span class="text-gray-400 text-xs">|</span>
+                        <span class="text-gray-500 text-xs">${logCount} log</span>
+                    </div>
+                    <div class="space-y-0">
+                        ${logsHtml}
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        // En son güncellemeler en altta - scroll'u en alta kaydır
+        container.scrollTop = container.scrollHeight;
+        return;
+    }
+    
+    // Backward compatibility: Eğer taskGroups yoksa eski formatı kullan
+    if (logs.length === 0) {
+        container.innerHTML = '<div class="text-gray-500 text-center py-8">Log bulunamadı</div>';
+        return;
+    }
+    
+    container.innerHTML = logs.map(log => {
+        const levelColors = {
+            'DEBUG': 'text-gray-400',
+            'INFO': 'text-blue-400',
+            'WARNING': 'text-yellow-400',
+            'ERROR': 'text-red-400',
+            'SUCCESS': 'text-green-400'
+        };
+        
+        const levelColor = levelColors[log.level] || 'text-gray-300';
+        const timestamp = new Date(log.created_at).toLocaleTimeString('tr-TR');
+        const isSelected = selectedLogIds.has(log.id);
+        
+        return `
+            <div class="flex items-start gap-2 py-1 hover:bg-gray-800 rounded px-2 ${isSelected ? 'bg-gray-800' : ''}" data-log-id="${log.id}">
+                <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleLogSelection(${log.id})" class="mt-1">
+                <span class="text-gray-500 text-xs w-20">${timestamp}</span>
+                <span class="${levelColor} font-semibold w-20">[${log.level}]</span>
+                <span class="text-blue-300 w-24">${log.source_agent}</span>
+                ${log.target_agent ? `<span class="text-gray-400">→</span><span class="text-purple-300 w-24">${log.target_agent}</span>` : ''}
+                <span class="flex-1">${escapeHtml(log.message)}</span>
+                <button onclick="deleteLog(${log.id})" class="text-red-400 hover:text-red-300 px-2">✕</button>
+            </div>
+        `;
+    }).join('');
+    
+    // En son güncellemeler en altta - scroll'u en alta kaydır
+    container.scrollTop = container.scrollHeight;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function toggleLogSelection(logId) {
+    if (selectedLogIds.has(logId)) {
+        selectedLogIds.delete(logId);
+    } else {
+        selectedLogIds.add(logId);
+    }
+    
+    // Update UI
+    const logElement = document.querySelector(`[data-log-id="${logId}"]`);
+    if (logElement) {
+        if (selectedLogIds.has(logId)) {
+            logElement.classList.add('bg-gray-800');
+        } else {
+            logElement.classList.remove('bg-gray-800');
+        }
+    }
+}
+
+async function deleteLog(logId) {
+    if (!confirm('Bu log\'u silmek istediğinizden emin misiniz?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/agents/reporter/api/logs/${logId}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        if (data.status === 'success') {
+            selectedLogIds.delete(logId);
+            loadLogs();
+        } else {
+            alert('Log silinirken hata oluştu: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Log silme hatası:', error);
+        alert('Log silinirken hata oluştu');
+    }
+}
+
+async function clearSelectedLogs() {
+    if (selectedLogIds.size === 0) {
+        alert('Lütfen silmek için log seçin');
+        return;
+    }
+    
+    if (!confirm(`${selectedLogIds.size} log'u silmek istediğinizden emin misiniz?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/agents/reporter/api/logs', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(Array.from(selectedLogIds))
+        });
+        
+        const data = await response.json();
+        if (data.status === 'success') {
+            selectedLogIds.clear();
+            loadLogs();
+            alert(`${data.deleted_count} log silindi`);
+        } else {
+            alert('Loglar silinirken hata oluştu: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Log silme hatası:', error);
+        alert('Loglar silinirken hata oluştu');
+    }
+}
+
+async function clearAllLogs() {
+    // Çift onay - çok tehlikeli bir işlem
+    if (!confirm('⚠️ DİKKAT: TÜM LOGLAR SİLİNECEK!\n\nBu işlem geri alınamaz. Veritabanındaki tüm reporter logları kalıcı olarak silinecek.\n\nDevam etmek istediğinizden emin misiniz?')) {
+        return;
+    }
+    
+    // İkinci onay
+    if (!confirm('Son bir kez daha onaylıyor musunuz?\n\nTÜM LOGLAR SİLİNECEK - GERİ ALINAMAZ!')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/agents/reporter/api/logs/clear-all', {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        if (data.status === 'success') {
+            selectedLogIds.clear();
+            loadLogs();
+            alert(`✅ Tüm loglar başarıyla silindi (${data.deleted_count} log)`);
+        } else {
+            alert('Tüm loglar silinirken hata oluştu: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Tüm logları silme hatası:', error);
+        alert('Tüm loglar silinirken hata oluştu');
+    }
+}
+
+function toggleAutoRefresh() {
+    autoRefreshEnabled = !autoRefreshEnabled;
+    const btn = document.getElementById('autoRefreshBtn');
+    
+    if (autoRefreshEnabled) {
+        btn.textContent = 'Auto-Refresh: Açık';
+        btn.classList.remove('bg-gray-600');
+        btn.classList.add('bg-indigo-600');
+        startAutoRefresh();
+    } else {
+        btn.textContent = 'Auto-Refresh: Kapalı';
+        btn.classList.remove('bg-indigo-600');
+        btn.classList.add('bg-gray-600');
+        stopAutoRefresh();
+    }
+}
+
+function startAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+    }
+    autoRefreshInterval = setInterval(loadLogs, 3000); // Her 3 saniyede bir
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+    }
+}
+
+// Filtre değişikliklerinde logları yeniden yükle
+document.getElementById('logLevelFilter').addEventListener('change', loadLogs);
+document.getElementById('logAgentFilter').addEventListener('change', loadLogs);
+
+// Sayfa yüklendiğinde logları yükle ve auto-refresh başlat
+document.addEventListener('DOMContentLoaded', function() {
+    loadLogs();
+    startAutoRefresh();
+});
+
+// Sayfa kapatılırken auto-refresh'i durdur
+window.addEventListener('beforeunload', stopAutoRefresh);
+</script>
+{% endblock %}

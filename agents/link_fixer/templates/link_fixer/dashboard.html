@@ -1,0 +1,362 @@
+{% extends "base.html" %}
+
+{% block title %}Link Fixer Agent - Dashboard{% endblock %}
+
+{% block page_title %}Link Fixer Agent - Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900">Link Fixer Agent</h2>
+                <p class="text-gray-600 mt-1">WordPress REST API ile redirect linkleri düzeltir</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- İstatistikler -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <!-- Bekleyenler -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Bekleyenler</h3>
+                <svg class="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-yellow-600">{{ total_pending }}</div>
+            <p class="text-sm text-gray-500 mt-2">İşlenmeyi bekleyen görevler</p>
+        </div>
+        
+        <!-- İşlenmekte -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">İşlenmekte</h3>
+                <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-blue-600">{{ total_in_progress }}</div>
+            <p class="text-sm text-gray-500 mt-2">Şu anda işlenen görevler</p>
+        </div>
+        
+        <!-- Tamamlananlar -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Tamamlananlar</h3>
+                <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-green-600">{{ total_completed }}</div>
+            <p class="text-sm text-gray-500 mt-2">Başarıyla tamamlanan görevler</p>
+        </div>
+        
+        <!-- Başarısızlar -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Başarısızlar</h3>
+                <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-red-600">{{ total_failed }}</div>
+            <p class="text-sm text-gray-500 mt-2">Başarısız olan görevler</p>
+        </div>
+    </div>
+    
+    <!-- Bekleyen Görevler -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            Bekleyen Görevler 
+            <span class="text-sm font-normal text-gray-500">({{ total_pending }} görev)</span>
+        </h3>
+        
+        <!-- Debug Bilgisi -->
+        {% if total_pending > 0 and not pending_tasks %}
+            <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4" role="alert">
+                <p class="font-bold">⚠️ Uyarı!</p>
+                <p>Toplam {{ total_pending }} bekleyen görev var ama gösterilemedi!</p>
+                <p class="text-xs mt-2">Lütfen sunucu terminal log'larını kontrol edin.</p>
+            </div>
+        {% endif %}
+        
+        <div class="space-y-4">
+            {% if pending_tasks %}
+                {% for task in pending_tasks %}
+                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <!-- Sol Taraf: Görev Bilgileri -->
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="text-xs font-semibold text-gray-500 uppercase">Görevin Tanımı ve Tanımlanan Hata</label>
+                                    <div class="mt-1 p-3 bg-gray-50 rounded-lg">
+                                        {% if task.task_description %}
+                                            <p class="text-sm text-gray-800 font-medium">{{ task.task_description }}</p>
+                                        {% endif %}
+                                        {% if task.error_message %}
+                                            <p class="text-sm text-red-600 mt-2">{{ task.error_message }}</p>
+                                        {% endif %}
+                                        {% if not task.task_description and not task.error_message %}
+                                            <p class="text-sm text-gray-500">Link düzeltme görevi</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label class="text-xs font-semibold text-gray-500 uppercase">Hangi Sayfada</label>
+                                    <div class="mt-1">
+                                        <a href="{{ task.page_url }}" target="_blank" 
+                                           class="text-sm text-indigo-600 hover:text-indigo-800 hover:underline break-all">
+                                            {{ task.page_url }}
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Sağ Taraf: URL Bilgileri -->
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="text-xs font-semibold text-gray-500 uppercase">Hata Veren Kod (Eski URL)</label>
+                                    <div class="mt-1">
+                                        <a href="{{ task.old_url }}" target="_blank" 
+                                           class="text-sm text-red-600 hover:text-red-800 hover:underline break-all">
+                                            {{ task.old_url }}
+                                        </a>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label class="text-xs font-semibold text-gray-500 uppercase">Düzeltilecek Sayfa (Yeni URL)</label>
+                                    <div class="mt-1">
+                                        <a href="{{ task.new_url }}" target="_blank" 
+                                           class="text-sm text-green-600 hover:text-green-800 hover:underline break-all">
+                                            {{ task.new_url }}
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Alt Kısım: Buton ve Tarih -->
+                        <div class="flex items-center justify-between pt-3 border-t border-gray-200">
+                            <span class="text-xs text-gray-500">
+                                Oluşturulma: {{ task.created_at_str if task.created_at_str else '-' }}
+                            </span>
+                            <button onclick="startFix({{ task.id }})" 
+                                    class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium">
+                                🔧 Düzeltmeye Başla
+                            </button>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="text-center py-8 text-gray-500">
+                    <p>Bekleyen görev yok</p>
+                    {% if total_pending > 0 %}
+                        <p class="text-xs text-red-500 mt-2">⚠️ Toplam {{ total_pending }} bekleyen görev var ama gösterilemedi!</p>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- İşlenmekte Olanlar -->
+    {% if in_progress_tasks %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">İşlenmekte Olanlar</h3>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sayfa URL</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Eski URL</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Yeni URL</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Başlangıç</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for task in in_progress_tasks %}
+                    <tr>
+                        <td class="px-4 py-3 text-sm text-gray-500">
+                            <a href="{{ task.page_url }}" target="_blank" class="text-indigo-600 hover:underline">
+                                {{ task.page_url[:40] }}{% if task.page_url|length > 40 %}...{% endif %}
+                            </a>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-900">
+                            <span class="text-red-600">{{ task.old_url[:30] }}{% if task.old_url|length > 30 %}...{% endif %}</span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-900">
+                            <span class="text-green-600">{{ task.new_url[:30] }}{% if task.new_url|length > 30 %}...{% endif %}</span>
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {{ task.started_at.strftime('%d.%m.%Y %H:%M') if task.started_at else '-' }}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm">
+                            <button onclick="showTaskLogs({{ task.id }})" 
+                                    class="text-indigo-600 hover:text-indigo-900">
+                                📋 Loglar
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Son Tamamlananlar -->
+    {% if completed_tasks %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Son Tamamlananlar</h3>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sayfa URL</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Eski URL</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Yeni URL</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tamamlanma</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for task in completed_tasks %}
+                    <tr>
+                        <td class="px-4 py-3 text-sm text-gray-500">
+                            <a href="{{ task.page_url }}" target="_blank" class="text-indigo-600 hover:underline">
+                                {{ task.page_url[:40] }}{% if task.page_url|length > 40 %}...{% endif %}
+                            </a>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-900">
+                            <span class="text-red-600">{{ task.old_url[:30] }}{% if task.old_url|length > 30 %}...{% endif %}</span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-900">
+                            <span class="text-green-600">{{ task.new_url[:30] }}{% if task.new_url|length > 30 %}...{% endif %}</span>
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {{ task.completed_at.strftime('%d.%m.%Y %H:%M') if task.completed_at else '-' }}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm">
+                            <button onclick="showTaskLogs({{ task.id }})" 
+                                    class="text-indigo-600 hover:text-indigo-900">
+                                📋 Loglar
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Log Modal -->
+<div id="taskLogModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 shadow-lg rounded-md bg-white">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Görev Logları</h3>
+            <button onclick="closeTaskLogModal()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <div id="taskLogContent" class="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm max-h-96 overflow-y-auto">
+            <p class="text-gray-500">Loglar yükleniyor...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+async function showTaskLogs(taskId) {
+    const modal = document.getElementById('taskLogModal');
+    const content = document.getElementById('taskLogContent');
+    
+    try {
+        const response = await fetch(`/agents/link-fixer/api/tasks/${taskId}`);
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            const task = data.task;
+            let logHtml = '';
+            
+            if (task.logs) {
+                // Logları formatla
+                const logs = task.logs.split('\n');
+                logs.forEach(log => {
+                    if (log.trim()) {
+                        const logType = log.includes('[error]') ? 'text-red-400' : 
+                                       log.includes('[success]') ? 'text-green-400' : 
+                                       'text-gray-300';
+                        logHtml += `<div class="${logType}">${log}</div>`;
+                    }
+                });
+            } else {
+                logHtml = '<div class="text-gray-500">Henüz log yok</div>';
+            }
+            
+            content.innerHTML = logHtml;
+            modal.classList.remove('hidden');
+        } else {
+            alert('Loglar yüklenirken hata oluştu');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Loglar yüklenirken bir hata oluştu');
+    }
+}
+
+function closeTaskLogModal() {
+    document.getElementById('taskLogModal').classList.add('hidden');
+}
+
+// Düzeltmeye başla
+async function startFix(taskId) {
+    if (!confirm('Bu görevi düzeltmeye başlamak istediğinize emin misiniz?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/agents/link-fixer/api/tasks/${taskId}/start-fix`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            alert('✅ Düzeltme başlatıldı!\n\nGörev arka planda işlenecek. Sayfa otomatik olarak yenilenecek...');
+            // 2 saniye sonra sayfayı yenile
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } else {
+            alert('❌ Hata: ' + (data.message || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Bağlantı hatası: ' + error.message);
+    }
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeTaskLogModal();
+    }
+});
+</script>
+{% endblock %}
+
+

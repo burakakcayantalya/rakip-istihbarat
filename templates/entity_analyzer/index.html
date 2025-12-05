@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+
+{% block title %}Entity Arama - Rakip İstihbarat{% endblock %}
+{% block page_title %}Entity Arama{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    
+    <!-- Arama Formu -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Yeni Entity Arama</h3>
+        <form id="searchForm" class="space-y-4">
+            <div class="flex items-center space-x-3">
+                <input type="text"
+                       id="searchTerm"
+                       placeholder="Örn: hollywood, istanbul, teknoloji..."
+                       required
+                       minlength="2"
+                       class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
+                <select id="aiProvider"
+                        class="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-white">
+                    <option value="gemini">Gemini AI</option>
+                    <option value="deepseek">Deepseek AI</option>
+                </select>
+                <button type="submit"
+                        id="searchBtn"
+                        class="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium">
+                    Ara
+                </button>
+            </div>
+            <p class="text-sm text-gray-500">Rakiplerin Meta Title, Description ve URL'lerinde entity araması yapılır</p>
+        </form>
+    </div>
+    
+    <!-- Canlı Log Ekranı -->
+    <div id="liveLogsContainer" class="bg-gray-900 rounded-xl shadow-sm border border-gray-700 p-4">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-lg font-semibold text-white">Canlı İşlem Logları</h3>
+            <div class="flex items-center space-x-2">
+                <span id="logStatus" class="text-xs text-gray-400">Son arama logları</span>
+                <button onclick="clearLogs()" class="text-gray-400 hover:text-white" title="Log'ları temizle">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div id="liveLogs" class="space-y-1 max-h-96 overflow-y-auto font-mono text-sm">
+            <div class="text-gray-500 text-center py-4">Henüz log yok. Yeni bir arama yapın...</div>
+        </div>
+    </div>
+    
+    <!-- Önceki Aramalar -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Önceki Aramalar</h3>
+        
+        {% if previous_searches %}
+        <div class="space-y-3">
+            {% for item in previous_searches %}
+            <div class="p-4 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors">
+                <div class="flex items-center justify-between">
+                    <a href="/entity-analyzer/search/{{ item.search.id }}" class="flex-1">
+                        <div class="flex items-center space-x-3">
+                            <h4 class="text-lg font-semibold text-gray-800">{{ item.search.search_term }}</h4>
+                            <span class="text-xs text-gray-500">{{ item.search.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+                        </div>
+                        <div class="flex items-center space-x-4 mt-2">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-3 h-3 bg-green-500 rounded-full"></span>
+                                <span class="text-sm text-gray-600">Tam Eşleşme: <strong>{{ item.exact_count }}</strong></span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="w-3 h-3 bg-yellow-500 rounded-full"></span>
+                                <span class="text-sm text-gray-600">Yarım Eşleşme: <strong>{{ item.partial_count }}</strong></span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="w-3 h-3 bg-orange-500 rounded-full"></span>
+                                <span class="text-sm text-gray-600">Düşük Eşleşme: <strong>{{ item.low_count }}</strong></span>
+                            </div>
+                            <div class="text-sm text-gray-500">
+                                Toplam: <strong>{{ item.total_count }}</strong> sonuç
+                            </div>
+                        </div>
+                    </a>
+                    <div class="flex items-center space-x-2 ml-4">
+                        <button onclick="updateSearch({{ item.search.id }}, '{{ item.search.search_term }}')" 
+                                class="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors">
+                            Güncelle
+                        </button>
+                        <button onclick="deleteSearch({{ item.search.id }}, '{{ item.search.search_term }}')" 
+                                class="px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 transition-colors">
+                            Sil
+                        </button>
+                        <a href="/entity-analyzer/search/{{ item.search.id }}">
+                            <svg class="w-5 h-5 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12 text-gray-500">
+            <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <p>Henüz arama yapılmamış</p>
+            <p class="text-sm mt-2">Yukarıdaki formdan entity araması başlatın</p>
+        </div>
+        {% endif %}
+    </div>
+    
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.getElementById('searchForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const searchTerm = document.getElementById('searchTerm').value.trim();
+        const aiProvider = document.getElementById('aiProvider').value;
+        const searchBtn = document.getElementById('searchBtn');
+        const originalText = searchBtn.innerHTML;
+
+        if (searchTerm.length < 2) {
+            showToast('Arama terimi en az 2 karakter olmalıdır', 'error');
+            return;
+        }
+
+        searchBtn.disabled = true;
+        searchBtn.innerHTML = '<svg class="animate-spin w-5 h-5 inline" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Analiz ediliyor...';
+
+        try {
+            const formData = new FormData();
+            formData.append('search_term', searchTerm);
+            formData.append('ai_provider', aiProvider);
+
+            const response = await fetch('/entity-analyzer/search', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.status === 'started') {
+                showToast(data.message + ' Arka planda çalışıyor...', 'success');
+                // Log ekranını göster ve log'ları takip et
+                showLiveLogs(data.search_id);
+                // Detay sayfasına yönlendirme kaldırıldı - kullanıcı log'ları görebilsin
+            } else {
+                showToast('Hata: ' + data.message, 'error');
+            }
+        } catch (error) {
+            showToast('Hata: ' + error.message, 'error');
+        } finally {
+            searchBtn.disabled = false;
+            searchBtn.innerHTML = originalText;
+        }
+    });
+    
+    // Arama güncelleme
+    async function updateSearch(searchId, searchTerm) {
+        if (!confirm(`"${searchTerm}" aramasını güncellemek istediğinize emin misiniz? Mevcut sonuçlar silinecek ve yeniden analiz yapılacak.`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/entity-analyzer/search/${searchId}/update`, {
+                method: 'POST'
+            });
+            
+            const data = await response.json();
+            
+            if (data.status === 'started') {
+                showToast(data.message, 'success');
+                // Log ekranını güncelle
+                showLiveLogs(searchId);
+            } else {
+                showToast('Hata: ' + data.message, 'error');
+            }
+        } catch (error) {
+            showToast('Hata: ' + error.message, 'error');
+        }
+    }
+    
+    // Arama silme
+    async function deleteSearch(searchId, searchTerm) {
+        if (!confirm(`"${searchTerm}" aramasını ve tüm sonuçlarını silmek istediğinize emin misiniz?`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/entity-analyzer/search/${searchId}`, {
+                method: 'DELETE'
+            });
+            
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                showToast(data.message, 'success');
+                // Sayfayı yenile
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                showToast('Hata: ' + data.message, 'error');
+            }
+        } catch (error) {
+            showToast('Hata: ' + error.message, 'error');
+        }
+    }
+    
+    // Canlı log ekranı
+    let logInterval = null;
+    let currentSearchId = null;
+    
+    function showLiveLogs(searchId) {
+        currentSearchId = searchId;
+        document.getElementById('logStatus').textContent = `Arama #${searchId} - Canlı takip`;
+        document.getElementById('liveLogs').innerHTML = '<div class="text-gray-500 text-center py-4">Log bekleniyor...</div>';
+        
+        // İlk log'ları hemen çek
+        fetchLogs(searchId);
+        
+        // Her 2 saniyede bir log'ları güncelle
+        if (logInterval) {
+            clearInterval(logInterval);
+        }
+        logInterval = setInterval(() => {
+            fetchLogs(searchId);
+        }, 2000);
+    }
+    
+    function clearLogs() {
+        if (logInterval) {
+            clearInterval(logInterval);
+            logInterval = null;
+        }
+        currentSearchId = null;
+        document.getElementById('logStatus').textContent = 'Log\'lar temizlendi';
+        document.getElementById('liveLogs').innerHTML = '<div class="text-gray-500 text-center py-4">Henüz log yok. Yeni bir arama yapın...</div>';
+    }
+    
+    async function fetchLogs(searchId) {
+        try {
+            const response = await fetch(`/entity-analyzer/api/search/${searchId}/logs`);
+            const data = await response.json();
+            
+            const logsContainer = document.getElementById('liveLogs');
+            if (data.logs && data.logs.length > 0) {
+                // Sadece bu aramaya ait log'ları göster (search_id filtresi zaten backend'de var ama emin olmak için)
+                const filteredLogs = data.logs.filter(log => {
+                    // Log mesajında search_id geçiyorsa kontrol et (opsiyonel)
+                    return true; // Backend zaten filtreliyor
+                });
+                
+                logsContainer.innerHTML = filteredLogs.map(log => {
+                    const time = new Date(log.created_at).toLocaleTimeString('tr-TR');
+                    let colorClass = 'text-gray-400';
+                    if (log.level === 'success') colorClass = 'text-green-400';
+                    else if (log.level === 'error') colorClass = 'text-red-400';
+                    else if (log.level === 'warning') colorClass = 'text-yellow-400';
+                    else if (log.level === 'info') colorClass = 'text-blue-400';
+                    
+                    // Gemini paketi için özel formatlama
+                    let message = escapeHtml(log.message);
+                    if (log.message.includes('Gemini\'ye gönderilen paket:')) {
+                        message = message.replace(/Gemini'ye gönderilen paket:/g, '<strong class="text-purple-400">🔵 Gemini\'ye gönderilen paket:</strong>');
+                        message = message.replace(/\n/g, '<br>');
+                    }
+                    
+                    return `
+                        <div class="flex items-start space-x-2 ${colorClass}">
+                            <span class="text-gray-500 text-xs w-16 flex-shrink-0">${time}</span>
+                            <span class="font-semibold w-20 flex-shrink-0">[${log.level.toUpperCase()}]</span>
+                            <span class="flex-1">${message}</span>
+                        </div>
+                    `;
+                }).join('');
+                
+                // En alta scroll
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+            } else {
+                logsContainer.innerHTML = '<div class="text-gray-500 text-center py-4">Henüz log yok...</div>';
+            }
+        } catch (error) {
+            console.error('Log çekme hatası:', error);
+        }
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Sayfa yüklendiğinde son aramanın log'larını göster
+    window.addEventListener('load', function() {
+        {% if latest_search_id %}
+        // En son aramanın log'larını göster
+        showLiveLogs({{ latest_search_id }});
+        {% else %}
+        // Log ekranını boş göster
+        document.getElementById('logStatus').textContent = 'Henüz arama yapılmamış';
+        {% endif %}
+    });
+</script>
+{% endblock %}
+

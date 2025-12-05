@@ -1,0 +1,431 @@
+{% extends "base.html" %}
+
+{% block title %}Observer Agent - {{ site.name }}{% endblock %}
+
+{% block page_title %}Observer Agent - {{ site.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Site Header -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="flex items-center space-x-3">
+                    <a href="/agents/observer" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                    </a>
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-900">{{ site.name }}</h2>
+                        <p class="text-sm text-gray-500">{{ site.domain }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex space-x-3">
+                <a href="/agents/observer/freshness/{{ site.id }}" 
+                   class="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors text-sm">
+                    📅 Freshness Raporu
+                </a>
+                <button onclick="clearAllTasks()" 
+                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
+                    🗑️ Bütün Görevleri Sil
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Yeni Görev Oluştur (EN ÜSTE) -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Yeni Görev Oluştur</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Site (Sabit)</label>
+                <input type="text" 
+                       value="{{ site.name }} ({{ site.domain }})" 
+                       disabled
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                <p class="text-xs text-gray-400 mt-1">Site seçimi sidebar'dan değiştirilebilir</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Görev Tipi</label>
+                <select id="taskTypeSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                    <option value="FRESHNESS_CHECK">Freshness Kontrolü</option>
+                    <option value="FULL_AUDIT">Tam Denetim</option>
+                    <option value="LINK_AUDIT">Link Denetimi</option>
+                    <option value="SCHEMA_CHECK">Schema Kontrolü</option>
+                    <option value="H1_CHECK">H1 Kontrolü</option>
+                    <option value="DUPLICATE_LINK_CHECK">Duplicate Link Kontrolü</option>
+                </select>
+            </div>
+        </div>
+        <button onclick="createTask()" 
+                class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+            Görev Oluştur
+        </button>
+        <p class="mt-2 text-xs text-gray-500">💡 Görevler arka planda çalışmaya devam eder, sayfa değişse bile durmaz.</p>
+    </div>
+    
+    <!-- 3 Kutu: Sıradaki / Tamamlanan / Raporlanan -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Sıradaki Görevler -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Sıradaki Görevler</h3>
+                <svg class="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-yellow-600">{{ pending_tasks }}</div>
+            <p class="text-sm text-gray-500 mt-2">Bekleyen görev sayısı</p>
+        </div>
+        
+        <!-- Tamamlanan Görevler -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Tamamlanan Görevler</h3>
+                <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-green-600">{{ completed_tasks }}</div>
+            <p class="text-sm text-gray-500 mt-2">Tamamlanan görev sayısı</p>
+        </div>
+        
+        <!-- Raporlanan Sorunlar -->
+        <a href="/agents/observer/reports/{{ site.id }}" class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow cursor-pointer">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Raporlanan Sorunlar</h3>
+                <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-red-600">{{ reported_issues }}</div>
+            <p class="text-sm text-gray-500 mt-2">Toplam rapor sayısı (Detaylar için tıklayın)</p>
+        </a>
+    </div>
+    
+    <!-- Progress Bar (Aktif Görev Varsa - 3'lü barın altına) -->
+    {% if active_task %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900">{{ active_task.description or "Aktif Görev" }}</h3>
+                <p class="text-sm text-gray-500 mt-1">{{ active_task.current_item or "İşlem başlatılıyor..." }}</p>
+            </div>
+            <div class="flex items-center space-x-3">
+                <span class="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                    {{ active_task.status.value }}
+                </span>
+                <button onclick="showTaskLogs({{ active_task.id }})" 
+                        class="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+                    📋 Loglar
+                </button>
+            </div>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-4">
+            <div id="progressBar" class="bg-indigo-600 h-4 rounded-full transition-all duration-300" 
+                 style="width: {{ active_task.progress_percentage }}%">
+            </div>
+        </div>
+        <div class="flex items-center justify-between mt-2 text-sm text-gray-600">
+            <span id="progressText">{{ active_task.processed_items }} / {{ active_task.total_items }} işlendi</span>
+            <span id="progressPercent">{{ active_task.progress_percentage }}%</span>
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-center py-8">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <p class="mt-4 text-gray-500">Şu anda aktif görev yok</p>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Son Görevler ve Son Raporlar - Yan Yana -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Son Görevler -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Son 5 Görev</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Görev Tipi</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Durum</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İlerleme</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tarih</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% if recent_tasks %}
+                            {% for task in recent_tasks %}
+                            <tr>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ task.task_type.value if task.task_type else '-' }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    <span class="px-2 py-1 text-xs font-semibold rounded-full
+                                        {% if task.status and task.status.value == 'COMPLETED' %}bg-green-100 text-green-800
+                                        {% elif task.status and task.status.value == 'RUNNING' %}bg-blue-100 text-blue-800
+                                        {% elif task.status and task.status.value == 'FAILED' %}bg-red-100 text-red-800
+                                        {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                        {{ task.status.value if task.status else '-' }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div class="bg-indigo-600 h-2 rounded-full" style="width: {{ task.progress_percentage or 0 }}%"></div>
+                                    </div>
+                                    <span class="text-xs">{{ task.progress_percentage or 0 }}%</span>
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                    {{ task.created_at.strftime('%d.%m.%Y %H:%M') if task.created_at else '-' }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="4" class="px-4 py-3 text-center text-sm text-gray-500">Henüz görev yok</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Son Raporlanan Hatalar -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Son 15 Rapor</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kural</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mesaj</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tarih</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% if recent_reports %}
+                            {% for report in recent_reports %}
+                            <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location.href='/agents/observer/reports/{{ site.id }}'">
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ report.rule_name }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    <span class="px-2 py-1 text-xs font-semibold rounded-full
+                                        {% if report.severity and report.severity.value == 'ERROR' %}bg-red-100 text-red-800
+                                        {% elif report.severity and report.severity.value == 'WARNING' %}bg-yellow-100 text-yellow-800
+                                        {% else %}bg-blue-100 text-blue-800{% endif %}">
+                                        {{ report.severity.value if report.severity else '-' }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-sm text-gray-900 max-w-xs truncate" title="{{ report.message }}">
+                                    {{ report.message[:50] }}{% if report.message|length > 50 %}...{% endif %}
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                    {{ report.found_at.strftime('%d.%m.%Y %H:%M') if report.found_at else '-' }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="4" class="px-4 py-3 text-center text-sm text-gray-500">Henüz rapor yok</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+            {% if recent_reports|length > 0 %}
+            <div class="mt-4 text-center">
+                <a href="/agents/observer/reports/{{ site.id }}" 
+                   class="text-sm text-indigo-600 hover:text-indigo-900">
+                    Tüm raporları görüntüle →
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function createTask() {
+    const taskType = document.getElementById('taskTypeSelect').value;
+    const siteId = {{ site.id }};
+    
+    fetch('/agents/observer/api/tasks/create', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            site_id: siteId,
+            task_type: taskType
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('Görev oluşturuldu!');
+            window.location.reload();
+        } else {
+            alert('Hata: ' + (data.message || 'Bilinmeyen hata'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Bir hata oluştu');
+    });
+}
+
+// Her 3 saniyede bir aktif görevi kontrol et ve sayfayı güncelle
+{% if active_task %}
+setInterval(() => {
+    fetch('/agents/observer/api/tasks?status=RUNNING&site_id={{ site.id }}')
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success' && data.tasks.length > 0) {
+                const task = data.tasks[0];
+                // Progress bar'ı güncelle
+                const progressBar = document.getElementById('progressBar');
+                const progressText = document.getElementById('progressText');
+                const progressPercent = document.getElementById('progressPercent');
+                
+                if (progressBar) {
+                    progressBar.style.width = task.progress_percentage + '%';
+                }
+                if (progressText) {
+                    progressText.textContent = `${task.processed_items || 0} / ${task.total_items || 0} işlendi`;
+                }
+                if (progressPercent) {
+                    progressPercent.textContent = `${task.progress_percentage || 0}%`;
+                }
+                
+                // Eğer görev tamamlandıysa sayfayı yenile
+                if (task.status === 'COMPLETED' || task.status === 'FAILED') {
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                }
+            } else {
+                // Aktif görev yoksa sayfayı yenile
+                window.location.reload();
+            }
+        })
+        .catch(error => {
+            console.error('Görev durumu kontrol hatası:', error);
+        });
+}, 3000);
+{% endif %}
+
+// Task Logs Modal
+async function showTaskLogs(taskId) {
+    const modal = document.getElementById('taskLogsModal');
+    const content = document.getElementById('taskLogsContent');
+    
+    try {
+        const response = await fetch(`/agents/observer/api/tasks/${taskId}/logs`);
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            const logs = data.logs || '';
+            
+            if (logs) {
+                // Log'ları formatla (satır satır)
+                const formattedLogs = logs.split('\n').map(line => {
+                    if (line.includes('[ERROR]') || line.includes('[CRITICAL]')) {
+                        return `<div class="text-red-400 font-mono text-xs whitespace-pre-wrap">${escapeHtml(line)}</div>`;
+                    } else if (line.includes('[WARNING]')) {
+                        return `<div class="text-yellow-400 font-mono text-xs whitespace-pre-wrap">${escapeHtml(line)}</div>`;
+                    } else if (line.includes('[SUCCESS]')) {
+                        return `<div class="text-green-400 font-mono text-xs whitespace-pre-wrap">${escapeHtml(line)}</div>`;
+                    } else if (line.includes('[INFO]')) {
+                        return `<div class="text-blue-400 font-mono text-xs whitespace-pre-wrap">${escapeHtml(line)}</div>`;
+                    } else {
+                        return `<div class="text-gray-300 font-mono text-xs whitespace-pre-wrap">${escapeHtml(line)}</div>`;
+                    }
+                }).join('');
+                
+                content.innerHTML = formattedLogs || '<div class="text-gray-500">Henüz log yok</div>';
+            } else {
+                content.innerHTML = '<div class="text-gray-500">Henüz log yok</div>';
+            }
+            
+            modal.classList.remove('hidden');
+        } else {
+            alert('Loglar yüklenirken hata oluştu: ' + (data.message || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        console.error('Log yükleme hatası:', error);
+        alert('Loglar yüklenirken bir hata oluştu');
+    }
+}
+
+function closeTaskLogs() {
+    document.getElementById('taskLogsModal').classList.add('hidden');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Bütün görevleri temizle
+async function clearAllTasks() {
+    if (!confirm('⚠️ DİKKAT!\n\nTüm görevler ve raporlar kalıcı olarak silinecek:\n- Observer görevleri ve raporları\n- Reviewer kuyruk öğeleri\n- Dispatcher görevleri\n- Link Fixer görevleri\n- Son 15 rapor\n\nBu işlem geri alınamaz. Devam etmek istediğinize emin misiniz?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/agents/observer/api/clear-all-tasks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            alert('✅ Tüm görevler ve raporlar temizlendi!\n\nDashboard\'a yönlendiriliyorsunuz...');
+            window.location.href = '/agents/observer/dashboard';
+        } else {
+            alert('❌ Hata: ' + (data.message || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        console.error('Görev temizleme hatası:', error);
+        alert('❌ Bağlantı hatası: ' + error.message);
+    }
+}
+
+// ESC tuşu ile modal'ı kapat
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeTaskLogs();
+    }
+});
+</script>
+
+<!-- Task Logs Modal -->
+<div id="taskLogsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+            <h3 class="text-xl font-semibold text-gray-900">Görev Logları</h3>
+            <button onclick="closeTaskLogs()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <div id="taskLogsContent" class="p-6 overflow-y-auto flex-1 bg-gray-900 text-gray-100 space-y-1">
+            <!-- Logs will be loaded here -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+

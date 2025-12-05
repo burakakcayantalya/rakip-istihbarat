@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Rakip İstihbarat{% endblock %}</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- Custom Styles -->
+    <style>
+        [x-cloak] { display: none !important; }
+        
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a1a1a1; }
+        
+        .diff-add { background-color: #d4edda; color: #155724; }
+        .diff-remove { background-color: #f8d7da; color: #721c24; text-decoration: line-through; }
+        
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .pulse-dot { animation: pulse 1.5s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        /* Status bar animation */
+        .status-text {
+            animation: slideText 20s linear infinite;
+        }
+        @keyframes slideText {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+    </style>
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div x-data="{ 
+        sidebarOpen: true, 
+        rakipMenuOpen: true, 
+        siteToolsMenuOpen: {% if current_page == 'site_tools' %}true{% else %}false{% endif %},
+        toolsMenuOpen: {% if current_page == 'entity_analyzer' or current_page == 'entity_finder' or current_page == 'entity_finder_list' %}true{% else %}false{% endif %},
+        agentsMenuOpen: {% if current_page == 'observer' or current_page == 'reviewer' or current_page == 'dispatcher' or current_page == 'link_fixer' or current_page == 'ai_helper' %}true{% else %}false{% endif %},
+        aiHelperMenuOpen: {% if current_page == 'ai_helper' %}true{% else %}false{% endif %},
+        mySites: [], 
+        openSiteMenus: {},
+        aiHelperProjects: [],
+        selectedAgentSite: null,
+        currentPath: window.location.pathname
+    }" 
+         x-init="
+            fetch('/site-tools/api/my-sites').then(r => r.json()).then(data => {
+                mySites = data;
+                // URL'den site_id'yi bul ve menüyü aç
+                const pathMatch = currentPath.match(/\/site-tools\/(?:site|freshness|links)\/(\d+)/);
+                if (pathMatch) {
+                    const siteId = parseInt(pathMatch[1]);
+                    openSiteMenus[siteId] = true;
+                    siteToolsMenuOpen = true;
+                }
+            });
+            // AI Helper projelerini çek
+            fetch('/agents/ai-helper/api/projects').then(r => r.json()).then(data => {
+                if (data.status === 'success') {
+                    aiHelperProjects = data.projects || [];
+                    // URL'den project_id'yi bul ve menüyü aç
+                    const projectMatch = currentPath.match(/\/agents\/ai-helper\/project\/(\d+)/);
+                    if (projectMatch) {
+                        aiHelperMenuOpen = true;
+                    }
+                }
+            }).catch(function() {});
+            // Seçilen agent site'ini çek
+            fetch('/agents/observer/api/selected-site').then(r => r.json()).then(data => {
+                if (data.status === 'success' && data.site) {
+                    selectedAgentSite = data.site.name;
+                }
+            }).catch(function() {});
+         "
+         class="flex h-screen overflow-hidden">
+        
+        <!-- Sidebar -->
+        <aside :class="sidebarOpen ? 'w-64' : 'w-20'" 
+               class="bg-gray-900 text-white transition-all duration-300 flex flex-col">
+            
+            <!-- Logo -->
+            <div class="p-4 border-b border-gray-700">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                    </div>
+                    <span x-show="sidebarOpen" class="font-bold text-lg">Rakip İstihbarat</span>
+                </div>
+            </div>
+            
+            <!-- Navigation -->
+            <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+                
+                <!-- Dashboard -->
+                <a href="/" 
+                   class="flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors
+                          {% if current_page == 'dashboard' %}bg-indigo-600{% else %}hover:bg-gray-800{% endif %}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                    </svg>
+                    <span x-show="sidebarOpen">Dashboard</span>
+                </a>
+                
+                <!-- Rakip Takip (Collapsible Menu) -->
+                <div x-show="sidebarOpen">
+                    <button @click="rakipMenuOpen = !rakipMenuOpen"
+                            class="w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors hover:bg-gray-800
+                                   {% if current_page in ['sites', 'logs', 'puanlama'] %}bg-gray-800{% endif %}">
+                        <div class="flex items-center space-x-3">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
+                            <span>Rakip Takip</span>
+                        </div>
+                        <svg :class="rakipMenuOpen ? 'rotate-180' : ''" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    
+                    <!-- Sub Menu -->
+                    <div x-show="rakipMenuOpen" x-collapse class="ml-4 mt-1 space-y-1">
+                        <a href="/sites" 
+                           class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors text-sm
+                                  {% if current_page == 'sites' %}bg-indigo-600{% else %}hover:bg-gray-800 text-gray-300{% endif %}">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+                            </svg>
+                            <span>Siteler</span>
+                        </a>
+                        
+                        <a href="/logs" 
+                           class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors text-sm
+                                  {% if current_page == 'logs' %}bg-indigo-600{% else %}hover:bg-gray-800 text-gray-300{% endif %}">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                            </svg>
+                            <span>Değişiklik Logları</span>
+                        </a>
+                        
+                        <a href="/puanlama" 
+                           class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors text-sm
+                                  {% if current_page == 'puanlama' %}bg-indigo-600{% else %}hover:bg-gray-800 text-gray-300{% endif %}">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                            </svg>
+                            <span>Puanlama</span>
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Collapsed state için Rakip Takip -->
+                <div x-show="!sidebarOpen" class="space-y-1">
+                    <a href="/sites" 
+                       class="flex items-center justify-center p-3 rounded-lg transition-colors
+                              {% if current_page == 'sites' %}bg-indigo-600{% else %}hover:bg-gray-800{% endif %}"
+                       title="Siteler">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+                        </svg>
+                    </a>
+                    <a href="/logs" 
+                       class="flex items-center justify-center p-3 rounded-lg transition-colors
+                              {% if current_page == 'logs' %}bg-indigo-600{% else %}hover:bg-gray-800{% endif %}"
+                       title="Loglar">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                        </svg>
+                    </a>
+                    <a href="/puanlama" 
+                       class="flex items-center justify-center p-3 rounded-lg transition-colors
+                              {% if current_page == 'puanlama' %}bg-indigo-600{% else %}hover:bg-gray-800{% endif %}"
+                       title="Puanlama">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                    </a>
+                </div>
+                
+                <!-- Site Araçları (Collapsible Menu) -->
+                <div x-show="sidebarOpen">
+                    <button @click="siteToolsMenuOpen = !siteToolsMenuOpen"
+                            class="w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors hover:bg-gray-800
+                                   {% if current_page == 'site_tools' %}bg-gray-800{% endif %}">
+                        <div class="flex items-center space-x-3">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                            <span>Site Araçları</span>
+                        </div>
+                        <svg :class="siteToolsMenuOpen ? 'rotate-180' : ''" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    
+                    <!-- Sub Menu - Siteler -->
+                    <div x-show="siteToolsMenuOpen" x-collapse class="ml-4 mt-1 space-y-1">
+                        <!-- Yeni Site Ekle -->
+                        <a href="/site-tools/add" 
+                           :class="currentPath.includes('/site-tools/add') ? 'bg-indigo-600 text-white' : 'hover:bg-gray-800 text-gray-300'"
+                           class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors text-sm mb-2 border-b border-gray-700 pb-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            <span>Yeni Site Ekle</span>
+                        </a>
+                        
+                        <template x-for="site in mySites" :key="site.id">
+                            <div>
+                                <!-- Site Button -->
+                                <button @click="openSiteMenus[site.id] = !openSiteMenus[site.id]"
+                                        class="w-full flex items-center justify-between px-4 py-2 rounded-lg transition-colors text-sm hover:bg-gray-800 text-gray-300">
+                                    <div class="flex items-center space-x-2">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                                  d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+                                        </svg>
+                                        <span class="truncate" x-text="site.name"></span>
+                                    </div>
+                                    <svg :class="openSiteMenus[site.id] ? 'rotate-180' : ''" class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                </button>
+                                
+                                <!-- Site Submenu -->
+                                <div x-show="openSiteMenus[site.id]" x-collapse class="ml-4 mt-1 space-y-1">
+                                    <a :href="`/site-tools/site/${site.id}`" 
+                                       :class="currentPath.includes(`/site-tools/site/${site.id}`) ? 'bg-indigo-600 text-white' : 'hover:bg-gray-800 text-gray-400'"
+                                       class="flex items-center space-x-2 px-4 py-1.5 rounded-lg transition-colors text-xs">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                        </svg>
+                                        <span>Detaylar</span>
+                                    </a>
+                                    
+                                    <a :href="`/site-tools/freshness/${site.id}`" 
+                                       :class="currentPath.includes(`/site-tools/freshness/${site.id}`) ? 'bg-indigo-600 text-white' : 'hover:bg-gray-800 text-gray-400'"
+                                       class="flex items-center space-x-2 px-4 py-1.5 rounded-lg transition-colors text-xs">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                        </svg>
+                                        <span>Freshness</span>
+                                    </a>
+                                    
+                                    <a :href="`/site-tools/links/${site.id}`" 
+                                       :class="currentPath.includes(`/site-tools/links/${site.id}`) ? 'bg-indigo-600 text-white' : 'hover:bg-gray-800 text-gray-400'"
+                                       class="flex items-center space-x-2 px-4 py-1.5 rounded-lg transition-colors text-xs">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                                  d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                                        </svg>
+                                        <span>Linkler</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </template>
+                        
+                        <!-- Site yoksa mesaj -->
+                        <div x-show="mySites.length === 0" class="px-4 py-2 text-xs text-gray-400">
+                            Henüz site eklenmemiş
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Collapsed state için Site Araçları -->
+                <div x-show="!sidebarOpen" class="space-y-1">
+                    <a href="/site-tools" 
+                       class="flex items-center justify-center p-3 rounded-lg transition-colors
+                              {% if current_page == 'site_tools' %}bg-indigo-600{% else %}hover:bg-gray-800{% endif %}"
+                       title="Site Araçları">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                    </a>
+                </div>
+                
+                <!-- Agents (Collapsible Menu) -->
+                <div x-show="sidebarOpen">
+                    <button @click="agentsMenuOpen = !agentsMenuOpen"
+                            class="w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors hover:bg-gray-800
+                                   {% if current_page == 'observer' %}bg-gray-800{% endif %}">
+                        <div class="flex items-center space-x-3">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                            </svg>
+                            <span>Agents</span>
+                        </div>
+                        <svg :class="agentsMenuOpen ? 'rotate-180' : ''" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    
+                    <!-- Sub Menu -->
+                    <div x-show="agentsMenuOpen" x-collapse class="ml-4 mt-1 space-y-1">
+                        <a href="/agents/observer" 
+                           :class="currentPath.includes('/agents/observer') ? 'bg-indigo-600 text-white' : 'hover:bg-gray-800 text-gray-300'"
+                           class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
+                            <span>Observer</span>
+                        </a>
+                        <a href="/agents/reviewer" 
+                           :class="currentPath.includes('/agents/reviewer') ? 'bg-indigo-600 text-white' : 'hover:bg-gray-800 text-gray-300'"
+                           class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                            </svg>
+                            <span>Reviewer</span>
+                        </a>
+                        <a href="/agents/dispatcher" 
+                           :class="currentPath.includes('/agents/dispatcher') ? 'bg-indigo-600 text-white' : 'hover:bg-gray-800 text-gray-300'"
+                           class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                            </svg>
+                            <span>Dispatcher</span>
+                        </a>
+                        <a href="/agents/link-fixer"
+                           :class="currentPath.includes('/agents/link-fixer') ? 'bg-indigo-600 text-white' : 'hover:bg-gray-800 text-gray-300'"
+                           class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                            </svg>
+                            <span>Link Fixer</span>
+                        </a>
+                        <a href="/agents/controller"
+                           :class="currentPath.includes('/agents/controller') ? 'bg-indigo-600 text-white' : 'hover:bg-gray-800 text-gray-300'"
+                           class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <span>Controller</span>
+                        </a>
+                        <a href="/agents/reporter"
+                           :class="currentPath.includes('/agents/reporter') ? 'bg-indigo-600 text-white' : 'hover:bg-gray-800 text-gray-300'"
+                           class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors text-sm border-t border-gray-700 pt-2 mt-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                            </svg>
+                            <span>Reporter (Hikayeler)</span>
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Collapsed state için Agents -->
+                <div x-show="!sidebarOpen" class="space-y-1">
+                    <a href="/agents/observer" 
+                       class="flex items-center justify-center p-3 rounded-lg transition-colors
+                              {% if current_page == 'observer' %}bg-indigo-600{% else %}hover:bg-gray-800{% endif %}"
+                       title="Agents">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                        </svg>
+                    </a>
+                </div>
+                
+                <!-- AI Helper (Collapsible Menu) -->
+                <div x-show="sidebarOpen">
+                    <button @click="aiHelperMenuOpen = !aiHelperMenuOpen"
+                            class="w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors hover:bg-gray-800
+                                   {% if current_page == 'ai_helper' %}bg-gray-800{% endif %}">
+                        <div class="flex items-center space-x-3">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                            </svg>
+                            <span>AI Helper</span>
+                        </div>
+                        <svg :class="aiHelperMenuOpen ? 'rotate-180' : ''" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    
+                    <!-- Sub Menu -->
+                    <div x-show="aiHelperMenuOpen" x-collapse class="ml-4 mt-1 space-y-1">
+                        <a href="/agents/ai-helper" 
+                           :class="currentPath == '/agents/ai-helper' ? 'bg-indigo-600 text-white' : 'hover:bg-gray-800 text-gray-300'"
+                           class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors text-sm mb-2 border-b border-gray-700 pb-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M12 4v16m8-8H4"/>
+                            </svg>
+                            <span>Yeni Site Ekle</span>
+                        </a>
+                        <template x-for="project in aiHelperProjects" :key="project.id">
+                            <a :href="`/agents/ai-helper/project/${project.id}`" 
+                               :class="currentPath.includes(`/agents/ai-helper/project/${project.id}`) ? 'bg-indigo-600 text-white' : 'hover:bg-gray-800 text-gray-300'"
+                               class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors text-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                                </svg>
+                                <span x-text="project.project_name"></span>
+                            </a>
+                        </template>
+                    </div>
+                </div>
+                
+                <!-- Collapsed state için AI Helper -->
+                <div x-show="!sidebarOpen" class="space-y-1">
+                    <a href="/agents/ai-helper" 
+                       class="flex items-center justify-center p-3 rounded-lg transition-colors
+                              {% if current_page == 'ai_helper' %}bg-indigo-600{% else %}hover:bg-gray-800{% endif %}"
+                       title="AI Helper">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                        </svg>
+                    </a>
+                </div>
+                
+                <!-- Araçlar (Collapsible Menu) -->
+                <div x-show="sidebarOpen">
+                    <button @click="toolsMenuOpen = !toolsMenuOpen"
+                            class="w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors hover:bg-gray-800
+                                   {% if current_page == 'entity_analyzer' %}bg-gray-800{% endif %}">
+                        <div class="flex items-center space-x-3">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+                            </svg>
+                            <span>Araçlar</span>
+                        </div>
+                        <svg :class="toolsMenuOpen ? 'rotate-180' : ''" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    
+                    <!-- Sub Menu -->
+                    <div x-show="toolsMenuOpen" x-collapse class="ml-4 mt-1 space-y-1">
+                        <a href="/entity-analyzer" 
+                           :class="currentPath.includes('/entity-analyzer') ? 'bg-indigo-600 text-white' : 'hover:bg-gray-800 text-gray-300'"
+                           class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                            <span>Entity Arama</span>
+                        </a>
+                        <a href="/entity-finder" 
+                           :class="currentPath.includes('/entity-finder') && !currentPath.includes('/entity-finder/list') ? 'bg-indigo-600 text-white' : 'hover:bg-gray-800 text-gray-300'"
+                           class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            <span>Entity Bul</span>
+                        </a>
+                        <a href="/entity-finder/list" 
+                           :class="currentPath.includes('/entity-finder/list') ? 'bg-indigo-600 text-white' : 'hover:bg-gray-800 text-gray-300'"
+                           class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                            </svg>
+                            <span>Entity Listesi</span>
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Collapsed state için Araçlar -->
+                <div x-show="!sidebarOpen" class="space-y-1">
+                    <a href="/entity-analyzer" 
+                       class="flex items-center justify-center p-3 rounded-lg transition-colors
+                              {% if current_page == 'entity_analyzer' %}bg-indigo-600{% else %}hover:bg-gray-800{% endif %}"
+                       title="Entity Arama">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </a>
+                </div>
+                
+                <!-- Kuyruk -->
+                <a href="/queue" 
+                   class="flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors
+                          {% if current_page == 'queue' %}bg-indigo-600{% else %}hover:bg-gray-800{% endif %}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                    </svg>
+                    <span x-show="sidebarOpen">Kuyruk</span>
+                </a>
+                
+                <!-- Ayarlar -->
+                <a href="/settings" 
+                   class="flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors
+                          {% if current_page == 'settings' %}bg-indigo-600{% else %}hover:bg-gray-800{% endif %}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    <span x-show="sidebarOpen">Ayarlar</span>
+                </a>
+            </nav>
+
+            <!-- Restart System (Bottom of sidebar) -->
+            <div class="p-4 border-t border-gray-700">
+                <button onclick="restartSystem()"
+                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors hover:bg-red-600 text-gray-300 hover:text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    <span x-show="sidebarOpen">Sistemi Yeniden Başlat</span>
+                </button>
+            </div>
+
+            <!-- Toggle Button -->
+            <button @click="sidebarOpen = !sidebarOpen" 
+                    class="p-4 border-t border-gray-700 hover:bg-gray-800 transition-colors">
+                <svg :class="sidebarOpen ? 'rotate-180' : ''" 
+                     class="w-5 h-5 mx-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
+                </svg>
+            </button>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto flex flex-col">
+            <!-- Header with Live Status -->
+            <header class="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <h1 class="text-2xl font-semibold text-gray-800">
+                        {% block page_title %}Dashboard{% endblock %}
+                    </h1>
+                    
+                    <!-- Live System Status -->
+                    <div x-data="systemStatus()" x-init="startPolling()" class="flex items-center space-x-4">
+                        <!-- Status Indicator -->
+                        <div class="flex items-center space-x-2 bg-gray-100 rounded-lg px-4 py-2 min-w-[300px] max-w-[500px]">
+                            <!-- Dot indicator -->
+                            <div :class="status.current_task === 'Boşta' ? 'bg-gray-400' : 'bg-green-500 pulse-dot'" 
+                                 class="w-2 h-2 rounded-full flex-shrink-0"></div>
+                            
+                            <!-- Status text -->
+                            <div class="flex-1 overflow-hidden">
+                                <p class="text-xs text-gray-500 truncate" x-text="status.current_task"></p>
+                                <p x-show="status.current_site" class="text-xs font-medium text-gray-700 truncate" 
+                                   x-text="status.current_site + (status.current_url ? ': ' + status.current_url : '')"></p>
+                                <p x-show="!status.current_site && status.last_completed_task" 
+                                   class="text-xs text-gray-500 truncate"
+                                   x-text="'Son: ' + status.last_completed_task"></p>
+                            </div>
+                            
+                            <!-- Queue badge -->
+                            <span x-show="status.queue_size > 0" 
+                                  class="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full flex-shrink-0"
+                                  x-text="'Sırada: ' + status.queue_size"></span>
+                        </div>
+                        
+                        <span class="text-sm text-gray-500">v2.0.0</span>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Page Content -->
+            <div class="flex-1 p-6 overflow-y-auto">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+    
+    <!-- Modal Container -->
+    <div id="modal-container"></div>
+    
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+    
+    <!-- Scripts -->
+    <script>
+        // System Status Alpine Component
+        function systemStatus() {
+            return {
+                status: {
+                    current_task: 'Yükleniyor...',
+                    current_site: '',
+                    current_url: '',
+                    queue_size: 0,
+                    last_completed_task: '',
+                    running_jobs_count: 0
+                },
+                
+                async fetchStatus() {
+                    try {
+                        const response = await fetch('/api/system-status');
+                        this.status = await response.json();
+                    } catch (error) {
+                        console.error('Status fetch error:', error);
+                    }
+                },
+                
+                startPolling() {
+                    this.fetchStatus();
+                    setInterval(() => this.fetchStatus(), 3000); // Her 3 saniyede güncelle
+                }
+            }
+        }
+        
+        // Toast notification function
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const colors = {
+                'success': 'bg-green-500',
+                'error': 'bg-red-500',
+                'info': 'bg-blue-500',
+                'warning': 'bg-yellow-500'
+            };
+            
+            toast.className = `${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg fade-in`;
+            toast.textContent = message;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+        
+        // API helper
+        async function apiCall(url, method = 'GET', data = null) {
+            const options = {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            };
+            
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+            
+            const response = await fetch(url, options);
+            return response.json();
+        }
+        
+        // Restart System
+        async function restartSystem() {
+            if (!confirm('Sistemi yeniden başlatmak istediğinize emin misiniz? Cache temizlenecek ve sistem yeniden başlatılacak.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/system/restart', {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    alert('Sistem yeniden başlatılıyor... Sayfa otomatik olarak yenilenecek.');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    alert('Hata: ' + data.message);
+                }
+            } catch (error) {
+                alert('Hata: ' + error.message);
+            }
+        }
+    </script>
+    
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

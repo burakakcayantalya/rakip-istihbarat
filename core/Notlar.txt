@@ -1,0 +1,27 @@
+04.11.2025 Güncellemeleri
+
+** Internal Links**
+Restapi ile internal linkleri düzeltme
+Restapi ile internal linkleri alt_text ekleme ve kontrol
+
+**Ai Helper**
+Url Bazlı Internal Link Sorgusu baslatma
+Entity Ekleme
+Bloglar Arası Internal Links
+Internal Link Ai mantığının iyileştirilmesi
+
+**Main Dashboard**
+Main Dashboard
+-Görevler
+-GÜncellemeler
+-Tazelik istatiskleri
+-Kuyrukta Bekleyenler
+-Fixed Errors
+
+**SERP**
+Google Sıralaması ve Content Update Eşleştirme
+
+**.htaccsess Düzenleme**
+Sitede eksik olan 301 redirect ya da gereksiz olan redirectleri temizleme
+
+**

@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}Observer Agent - Raporlar - {{ site.name }}{% endblock %}
+
+{% block page_title %}Observer Agent - Raporlar{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <a href="/agents/observer/site/{{ site.id }}" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </a>
+                <div>
+                    <h2 class="text-xl font-semibold text-gray-900">{{ site.name }}</h2>
+                    <p class="text-sm text-gray-500">Raporlanan Sorunlar</p>
+                </div>
+            </div>
+            <div class="flex space-x-3">
+                <select id="severityFilter" onchange="filterReports()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="">Tüm Severity</option>
+                    <option value="ERROR">Error</option>
+                    <option value="WARNING">Warning</option>
+                    <option value="INFO">Info</option>
+                </select>
+                <select id="ruleFilter" onchange="filterReports()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="">Tüm Kurallar</option>
+                    <option value="H1_CHECK">H1 Kontrolü</option>
+                    <option value="SCHEMA_CHECK">Schema Kontrolü</option>
+                    <option value="LINK_AUDIT">Link Denetimi</option>
+                    <option value="DUPLICATE_LINK_CHECK">Duplicate Link</option>
+                    <option value="FRESHNESS_CHECK">Freshness</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-lg shadow p-4">
+            <p class="text-sm text-gray-500">Toplam Rapor</p>
+            <p class="text-2xl font-bold text-gray-900">{{ total_reports }}</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+            <p class="text-sm text-gray-500">Error</p>
+            <p class="text-2xl font-bold text-red-600">{{ error_count }}</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+            <p class="text-sm text-gray-500">Warning</p>
+            <p class="text-2xl font-bold text-yellow-600">{{ warning_count }}</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+            <p class="text-sm text-gray-500">Info</p>
+            <p class="text-2xl font-bold text-blue-600">{{ info_count }}</p>
+        </div>
+    </div>
+    
+    <!-- Reports Table -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kural</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mesaj</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sayfa</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tarih</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="reportsTableBody">
+                    {% if reports %}
+                        {% for report in reports %}
+                        <tr class="hover:bg-gray-50 cursor-pointer" onclick="showReportDetail({{ report.id }})">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {{ report.rule_name }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full
+                                    {% if report.severity and report.severity.value == 'ERROR' %}bg-red-100 text-red-800
+                                    {% elif report.severity and report.severity.value == 'WARNING' %}bg-yellow-100 text-yellow-800
+                                    {% else %}bg-blue-100 text-blue-800{% endif %}">
+                                    {{ report.severity.value if report.severity else '-' }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-900 max-w-md truncate">
+                                {{ report.message or '-' }}
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-500">
+                                {% if report.page_url %}
+                                <a href="{{ report.page_url }}" target="_blank" class="text-indigo-600 hover:underline truncate block max-w-xs">
+                                    {{ report.page_url[:50] }}{% if report.page_url|length > 50 %}...{% endif %}
+                                </a>
+                                {% else %}
+                                <span class="text-gray-400">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ report.found_at.strftime('%d.%m.%Y %H:%M') if report.found_at else '-' }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                <button onclick="event.stopPropagation(); showReportDetail({{ report.id }})" 
+                                        class="text-indigo-600 hover:text-indigo-900">
+                                    Detay
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">Henüz rapor yok</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="bg-white rounded-lg shadow p-4">
+        <div class="flex items-center justify-between">
+            <div class="text-sm text-gray-500">
+                Sayfa {{ current_page_num }} / {{ total_pages }} (Toplam {{ total_reports }} rapor)
+            </div>
+            <div class="flex space-x-2">
+                {% if current_page_num > 1 %}
+                <a href="?page={{ current_page_num - 1 }}{% if severity_filter %}&severity={{ severity_filter }}{% endif %}{% if rule_filter %}&rule={{ rule_filter }}{% endif %}" 
+                   class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+                    Önceki
+                </a>
+                {% endif %}
+                {% if current_page_num < total_pages %}
+                <a href="?page={{ current_page_num + 1 }}{% if severity_filter %}&severity={{ severity_filter }}{% endif %}{% if rule_filter %}&rule={{ rule_filter }}{% endif %}" 
+                   class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+                    Sonraki
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Report Detail Modal -->
+<div id="reportDetailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-semibold text-gray-900">Rapor Detayı</h3>
+                <button onclick="closeReportDetail()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="reportDetailContent" class="space-y-4">
+                <!-- Content will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Reports will be loaded via API when needed
+function filterReports() {
+    const severity = document.getElementById('severityFilter').value;
+    const rule = document.getElementById('ruleFilter').value;
+    
+    const params = new URLSearchParams();
+    if (severity) params.append('severity', severity);
+    if (rule) params.append('rule', rule);
+    
+    window.location.href = '?' + params.toString();
+}
+
+async function showReportDetail(reportId) {
+    const modal = document.getElementById('reportDetailModal');
+    const content = document.getElementById('reportDetailContent');
+    
+    try {
+        const response = await fetch(`/agents/observer/api/reports/${reportId}`);
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            const report = data.report;
+            
+            content.innerHTML = `
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-sm font-medium text-gray-500">Kural</label>
+                        <p class="text-lg font-semibold text-gray-900">${report.rule_name}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-500">Severity</label>
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full
+                            ${report.severity === 'ERROR' ? 'bg-red-100 text-red-800' : 
+                              report.severity === 'WARNING' ? 'bg-yellow-100 text-yellow-800' : 
+                              'bg-blue-100 text-blue-800'}">
+                            ${report.severity}
+                        </span>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-500">Mesaj</label>
+                        <p class="text-gray-900">${report.message}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-500">Sayfa URL</label>
+                        <a href="${report.page_url}" target="_blank" class="text-indigo-600 hover:underline break-all">
+                            ${report.page_url}
+                        </a>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-500">Detaylar</label>
+                        <pre class="bg-gray-50 p-4 rounded-lg text-sm overflow-x-auto">${JSON.stringify(report.details, null, 2)}</pre>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-500">Tarih</label>
+                        <p class="text-gray-900">${report.found_at || '-'}</p>
+                    </div>
+                </div>
+            `;
+            
+            modal.classList.remove('hidden');
+        }
+    } catch (error) {
+        console.error('Rapor detayı yüklenirken hata:', error);
+        alert('Rapor detayı yüklenirken bir hata oluştu');
+    }
+}
+
+function closeReportDetail() {
+    document.getElementById('reportDetailModal').classList.add('hidden');
+}
+
+// ESC tuşu ile modal'ı kapat
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeReportDetail();
+    }
+});
+</script>
+{% endblock %}
+

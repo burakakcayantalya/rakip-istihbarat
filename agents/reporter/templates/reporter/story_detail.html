@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+
+{% block title %}Görev Hikayesi #{{ controller_task.id }}{% endblock %}
+
+{% block page_title %}Görev Hikayesi #{{ controller_task.id }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Back Button -->
+    <div>
+        <a href="/agents/reporter/" class="text-indigo-600 hover:text-indigo-900">
+            ← Geri Dön
+        </a>
+    </div>
+
+    <!-- Hata Spot Işığı -->
+    {% set failed_step = None %}
+    {% for item in timeline %}
+        {% if item.status in ['FAILED', 'VERIFIED_FAILED', 'ERROR'] and not failed_step %}
+            {% set failed_step = item %}
+        {% endif %}
+    {% endfor %}
+
+    {% if failed_step or controller_task.status.value == 'VERIFIED_FAILED' %}
+    <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-lg shadow-sm">
+        <div class="flex items-start">
+            <div class="flex-shrink-0">
+                <svg class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <div class="ml-3 w-full">
+                <h3 class="text-lg font-medium text-red-800">
+                    ⚠️ Operasyon Başarısız Oldu
+                </h3>
+                <div class="mt-2 text-sm text-red-700">
+                    <p class="font-bold mb-1">
+                        Sorun Kaynağı: <span class="uppercase tracking-wide">{{ failed_step.agent if failed_step else controller_task.source_agent }}</span>
+                    </p>
+                    <div class="bg-red-100 p-3 rounded border border-red-200 font-mono mt-2 overflow-x-auto text-xs">
+                        {% if failed_step and failed_step.details %}
+                            {{ failed_step.details.error_message or failed_step.details.message or failed_step.details.result or "Bilinmeyen Hata" }}
+                        {% elif controller_task.agent_report %}
+                            {% if controller_task.agent_report is mapping %}
+                                {{ controller_task.agent_report.error_message or controller_task.agent_report.message or controller_task.agent_report.result or "Detaylı hata raporu bulunamadı." }}
+                            {% else %}
+                                {{ controller_task.agent_report }}
+                            {% endif %}
+                        {% else %}
+                            Detaylı hata raporu bulunamadı.
+                        {% endif %}
+                    </div>
+                    
+                    {% if controller_task.retry_count < 3 %}
+                    <div class="mt-4">
+                        <button onclick="retryTask({{ controller_task.id }})" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 text-xs font-bold uppercase tracking-wider shadow-sm transition">
+                            ⚡ Tekrar Dene (Retry #{{ controller_task.retry_count + 1 }})
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Görev Özeti -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-start justify-between">
+            <div class="flex-1">
+                <h2 class="text-2xl font-bold text-gray-900 mb-2">{{ controller_task.task_description }}</h2>
+                <div class="flex items-center space-x-4 text-sm text-gray-600">
+                    <span>Sayfa: <a href="{{ controller_task.page_url }}" target="_blank" class="text-indigo-600 hover:underline">{{ controller_task.page_url }}</a></span>
+                    <span>•</span>
+                    <span>Görev: {{ controller_task.task_type }}</span>
+                    <span>•</span>
+                    <span>Agent: <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">{{ controller_task.source_agent }}</span></span>
+                </div>
+            </div>
+            <div class="text-right">
+                <span class="px-3 py-1 text-sm font-semibold rounded-full
+                    {% if controller_task.status.value == 'VERIFIED_SUCCESS' %}bg-green-100 text-green-800
+                    {% elif controller_task.status.value == 'VERIFIED_FAILED' %}bg-red-100 text-red-800
+                    {% elif controller_task.status.value == 'RETRY_ASSIGNED' %}bg-orange-100 text-orange-800
+                    {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                    {{ controller_task.status.value }}
+                </span>
+                {% if controller_task.retry_count > 0 %}
+                <div class="mt-2 text-sm text-gray-600">
+                    Retry: <span class="font-semibold">#{{ controller_task.retry_count }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="text-lg font-semibold text-gray-900">Görev Akışı Timeline</h3>
+            <div class="flex items-center gap-4">
+                <span class="text-sm text-gray-600">Toplam {{ timeline | length }} adım</span>
+            </div>
+        </div>
+        
+        <div class="mb-4 text-sm text-gray-600">
+            <p>Detayları görmek için adımlara tıklayın</p>
+        </div>
+
+        <div class="relative">
+            <!-- Timeline line -->
+            <div class="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+
+            <!-- Timeline items (Accordion) -->
+            <div class="space-y-2">
+            {% for item in timeline %}
+                {% set is_important = (item.step == 0 or item.step == 5 or item.step == 8) or (item.step is string and ('history_' in item.step or item.step in ['0a', '1a', '7a', '9a'])) %}
+                <div class="relative pl-20" x-data="{ isOpen: {{ 'true' if is_important else 'false' }} }">
+                <!-- Timeline dot -->
+                <div class="absolute left-0 top-0 flex items-center justify-center">
+                    <div class="flex items-center justify-center w-16 h-16 rounded-full border-4
+                        {% if item.status == 'COMPLETED' or item.status == 'VERIFIED_SUCCESS' %}
+                            bg-green-100 border-green-500
+                        {% elif item.status == 'FAILED' or item.status == 'VERIFIED_FAILED' %}
+                            bg-red-100 border-red-500
+                        {% elif item.status == 'IN_PROGRESS' or item.status == 'RUNNING' %}
+                            bg-blue-100 border-blue-500
+                        {% else %}
+                            bg-yellow-100 border-yellow-500
+                        {% endif %}">
+                        <span class="text-lg font-bold
+                            {% if item.status == 'COMPLETED' or item.status == 'VERIFIED_SUCCESS' %}text-green-700
+                            {% elif item.status == 'FAILED' or item.status == 'VERIFIED_FAILED' %}text-red-700
+                            {% elif item.status == 'IN_PROGRESS' or item.status == 'RUNNING' %}text-blue-700
+                            {% else %}text-yellow-700{% endif %}">
+                            {{ item.step }}
+                        </span>
+                    </div>
+                </div>
+
+                    <!-- Accordion Header (Clickable) -->
+                    <button 
+                        @click="isOpen = !isOpen"
+                        class="w-full text-left bg-gray-50 hover:bg-gray-100 rounded-lg p-4 border border-gray-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                    >
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs font-semibold">{{ item.agent }}</span>
+                                    <h4 class="text-base font-semibold text-gray-900">{{ item.action }}</h4>
+                                </div>
+                                <p class="text-xs text-gray-600 mt-1">
+                                {{ item.timestamp.strftime('%d.%m.%Y %H:%M:%S') if item.timestamp else 'Tarih yok' }}
+                            </p>
+                        </div>
+                            <div class="flex items-center gap-3">
+                        <span class="px-2 py-1 text-xs font-semibold rounded
+                            {% if item.status == 'COMPLETED' or item.status == 'VERIFIED_SUCCESS' %}bg-green-100 text-green-800
+                            {% elif item.status == 'FAILED' or item.status == 'VERIFIED_FAILED' %}bg-red-100 text-red-800
+                            {% elif item.status == 'IN_PROGRESS' or item.status == 'RUNNING' %}bg-blue-100 text-blue-800
+                            {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                            {{ item.status }}
+                        </span>
+                                <!-- Chevron Icon -->
+                                <svg 
+                                    class="w-5 h-5 text-gray-500 transition-transform duration-200"
+                                    :class="{ 'rotate-180': isOpen }"
+                                    fill="none" 
+                                    stroke="currentColor" 
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </div>
+                    </div>
+                    </button>
+
+                    <!-- Accordion Content (Collapsible) -->
+                    <div 
+                        x-show="isOpen"
+                        x-transition:enter="transition ease-out duration-200"
+                        x-transition:enter-start="opacity-0 transform -translate-y-2"
+                        x-transition:enter-end="opacity-100 transform translate-y-0"
+                        x-transition:leave="transition ease-in duration-150"
+                        x-transition:leave-start="opacity-100 transform translate-y-0"
+                        x-transition:leave-end="opacity-0 transform -translate-y-2"
+                        class="mt-2 bg-white rounded-lg p-4 border border-gray-200 shadow-sm"
+                        style="display: none;"
+                    >
+                    <!-- Details -->
+                    {% if item.details %}
+                        <div class="space-y-3">
+                            <h5 class="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Detaylar:</h5>
+                            <div class="text-sm text-gray-600 space-y-2">
+                            {% for key, value in item.details.items() %}
+                                    {% if item.agent == 'Link Fixer' and key == 'old_url' and 'new_url' in item.details %}
+                                        <!-- Link Diff Gösterimi -->
+                                        <div class="col-span-2 mt-2 mb-4">
+                                            <strong class="text-gray-700 block mb-2">🔗 Link Değişimi:</strong>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-0 border border-gray-300 rounded-lg overflow-hidden text-xs md:text-sm font-mono">
+                                                <div class="bg-red-50 p-3 border-b md:border-b-0 md:border-r border-gray-300">
+                                                    <span class="block text-red-600 font-bold mb-1 text-[10px] uppercase tracking-wider">❌ ESKİ (BROKEN)</span>
+                                                    <span class="text-red-900 break-all bg-red-100 px-1 rounded">{{ item.details.old_url }}</span>
+                                                </div>
+                                                <div class="bg-green-50 p-3">
+                                                    <span class="block text-green-600 font-bold mb-1 text-[10px] uppercase tracking-wider">✅ YENİ (FIXED)</span>
+                                                    <span class="text-green-900 break-all bg-green-100 px-1 rounded">{{ item.details.new_url }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% elif key == 'new_url' and 'old_url' in item.details %}
+                                        <!-- new_url zaten old_url ile birlikte gösterildi, atla -->
+                                    {% elif value is string or value is number or value is none %}
+                                        <div class="flex items-start gap-2">
+                                            <strong class="text-gray-700 min-w-[120px]">{{ key }}:</strong>
+                                            <span class="flex-1">
+                                        {% if value is none %}
+                                            <span class="text-gray-400">-</span>
+                                                {% elif key in ['old_url', 'new_url', 'source_url', 'target_url'] %}
+                                                    <a href="{{ value }}" target="_blank" class="text-indigo-600 hover:underline break-all">{{ value }}</a>
+                                                {% elif key in ['description', 'action_plan', 'task_description', 'verification_notes', 'message'] %}
+                                            <span class="text-gray-900">{{ value }}</span>
+                                        {% else %}
+                                            {{ value }}
+                                        {% endif %}
+                                            </span>
+                                    </div>
+                                {% elif value is mapping %}
+                                        <!-- Akıllı Tablo Gösterimi -->
+                                        <div class="mt-3">
+                                            <strong class="text-gray-700 block mb-1 capitalize">{{ key.replace('_', ' ') }}:</strong>
+                                            
+                                            {% set is_error_detail = key in ['error_details', 'exception', 'traceback'] or 'error' in key.lower() %}
+                                            
+                                            <div class="rounded-lg border overflow-hidden {{ 'border-red-200 bg-red-50' if is_error_detail else 'border-gray-200 bg-gray-50' }}">
+                                                <table class="min-w-full text-xs text-left">
+                                                    <tbody class="divide-y divide-gray-200">
+                                                        {% for sub_key, sub_val in value.items() %}
+                                                        <tr>
+                                                            <td class="px-3 py-2 font-medium text-gray-600 bg-gray-100 w-1/3 align-top border-r border-gray-200">
+                                                                {{ sub_key }}
+                                                            </td>
+                                                            <td class="px-3 py-2 font-mono text-gray-800 break-all whitespace-pre-wrap">
+                                                                {% if sub_val is mapping or (sub_val is iterable and sub_val is not string) %}
+                                                                    <pre class="text-xs bg-white p-2 rounded border">{{ sub_val | tojson(indent=2) }}</pre>
+                                                                {% else %}
+                                                                    {{ sub_val }}
+                                                                {% endif %}
+                                                            </td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                    </div>
+                                    {% elif value is iterable and value is not string %}
+                                    <div class="mt-2">
+                                            <strong class="text-gray-700">{{ key }} ({{ value | length }}):</strong>
+                                            <div class="mt-2 space-y-2">
+                                            {% for report in value %}
+                                                    <div class="bg-gray-50 p-3 rounded border border-gray-200">
+                                                    {% if report is mapping %}
+                                                            <div class="space-y-1 text-xs">
+                                                        {% for rkey, rvalue in report.items() %}
+                                                                    <div class="flex items-start gap-2">
+                                                                        <strong class="text-gray-700 min-w-[100px]">{{ rkey }}:</strong>
+                                                                        <span class="flex-1 text-gray-900">
+                                                                            {% if rvalue is mapping or (rvalue is iterable and rvalue is not string) %}
+                                                                                <pre class="text-xs bg-white p-2 rounded border">{{ rvalue | tojson(indent=2) }}</pre>
+                                                                            {% else %}
+                                                                                {{ rvalue }}
+                                                                            {% endif %}
+                                                                        </span>
+                                                                    </div>
+                                                        {% endfor %}
+                                                            </div>
+                                                    {% else %}
+                                                            <span class="text-xs text-gray-900">{{ report }}</span>
+                                                    {% endif %}
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                        {% else %}
+                        <p class="text-sm text-gray-500 italic">Detay bilgisi bulunmuyor.</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Final Sonuç -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Final Sonuç</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <p class="text-sm text-gray-600">Doğrulama Durumu:</p>
+                <p class="text-lg font-semibold
+                    {% if controller_task.is_verified %}text-green-600{% else %}text-red-600{% endif %}">
+                    {% if controller_task.is_verified %}✅ Doğrulandı{% else %}❌ Doğrulanamadı{% endif %}
+                </p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Retry Sayısı:</p>
+                <p class="text-lg font-semibold text-gray-900">{{ controller_task.retry_count }}</p>
+            </div>
+            {% if controller_task.verification_notes %}
+            <div class="col-span-2">
+                <p class="text-sm text-gray-600">Notlar:</p>
+                <p class="text-sm text-gray-900 bg-gray-50 p-3 rounded mt-1">{{ controller_task.verification_notes }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+async function retryTask(controllerTaskId) {
+    if (!confirm('Bu görevi tekrar denemek istediğinizden emin misiniz?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/agents/controller/api/verify/${controllerTaskId}`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        if (data.status === 'success') {
+            alert('Görev tekrar doğrulamaya gönderildi. Sayfa yenileniyor...');
+            window.location.reload();
+        } else {
+            alert('Hata: ' + (data.message || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        console.error('Retry hatası:', error);
+        alert('Retry işlemi sırasında hata oluştu');
+    }
+}
+</script>
+{% endblock %}

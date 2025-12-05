@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Site Araçları - Rakip İstihbarat{% endblock %}
+{% block page_title %}Site Araçları{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <p class="text-gray-500">Kendi siteleriniz için SEO analiz araçları</p>
+        <a href="/site-tools/add" 
+           class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            <span>Yeni Site Ekle</span>
+        </a>
+    </div>
+    
+    {% if sites_summary %}
+    <!-- Sites Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {% for item in sites_summary %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            
+            <!-- Site Header -->
+            <div class="p-4 border-b border-gray-100 bg-gradient-to-r from-green-50 to-emerald-50">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">{{ item.site.name }}</h3>
+                        <p class="text-sm text-gray-500">{{ item.site.domain }}</p>
+                    </div>
+                    <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                        Benim Sitem
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Stats Grid -->
+            <div class="p-4 grid grid-cols-3 gap-4 text-center">
+                <div>
+                    <p class="text-2xl font-bold text-gray-800">{{ item.page_count }}</p>
+                    <p class="text-xs text-gray-500">Sayfa</p>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-indigo-600">{{ item.analyzed_count }}</p>
+                    <p class="text-xs text-gray-500">Analiz</p>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold {% if item.stale_pages > 0 %}text-orange-500{% else %}text-green-600{% endif %}">
+                        {{ item.stale_pages }}
+                    </p>
+                    <p class="text-xs text-gray-500">{{ item.freshness_days }}+ Gün</p>
+                </div>
+            </div>
+            
+            <!-- Issues Summary -->
+            <div class="px-4 pb-4">
+                <div class="grid grid-cols-3 gap-2">
+                    <!-- H1 Issues -->
+                    <div class="p-3 rounded-lg {% if item.h1_issues > 0 %}bg-red-50{% else %}bg-green-50{% endif %}">
+                        <p class="text-lg font-bold {% if item.h1_issues > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                            {{ item.h1_issues }}
+                        </p>
+                        <p class="text-xs {% if item.h1_issues > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                            H1 Sorunu
+                        </p>
+                    </div>
+                    
+                    <!-- Schema Issues -->
+                    <div class="p-3 rounded-lg {% if item.schema_issues > 0 %}bg-yellow-50{% else %}bg-green-50{% endif %}">
+                        <p class="text-lg font-bold {% if item.schema_issues > 0 %}text-yellow-600{% else %}text-green-600{% endif %}">
+                            {{ item.schema_issues }}
+                        </p>
+                        <p class="text-xs {% if item.schema_issues > 0 %}text-yellow-600{% else %}text-green-600{% endif %}">
+                            Schema Eksik
+                        </p>
+                    </div>
+                    
+                    <!-- Broken Links -->
+                    <div class="p-3 rounded-lg {% if item.broken_links > 0 %}bg-red-50{% else %}bg-green-50{% endif %}">
+                        <p class="text-lg font-bold {% if item.broken_links > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                            {{ item.broken_links }}
+                        </p>
+                        <p class="text-xs {% if item.broken_links > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                            Kırık Link
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Actions -->
+            <div class="p-4 border-t border-gray-100 flex items-center justify-between bg-gray-50">
+                <div class="flex space-x-2">
+                    <a href="/site-tools/site/{{ item.site.id }}" 
+                       class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition-colors">
+                        Detaylar
+                    </a>
+                    <a href="/agents/observer/freshness/{{ item.site.id }}" 
+                       class="px-3 py-1.5 bg-orange-100 text-orange-700 text-sm rounded-lg hover:bg-orange-200 transition-colors">
+                        Freshness (Observer)
+                    </a>
+                    <a href="/site-tools/links/{{ item.site.id }}" 
+                       class="px-3 py-1.5 bg-blue-100 text-blue-700 text-sm rounded-lg hover:bg-blue-200 transition-colors">
+                        Linkler
+                    </a>
+                </div>
+                <button onclick="startAnalysis({{ item.site.id }}, '{{ item.site.name }}')"
+                        class="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors">
+                    🔍 Analiz Başlat
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    {% else %}
+    <!-- No Sites -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+        <svg class="w-16 h-16 mx-auto text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" 
+                  d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+        </svg>
+        <h3 class="text-lg font-semibold text-gray-800 mt-4">Henüz kendi siteniz yok</h3>
+        <p class="text-gray-500 mt-2">Site Araçları sadece "Benim Sitem" olarak etiketlenen siteler için çalışır.</p>
+        <a href="/sites/add" class="inline-flex items-center space-x-2 mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+            <span>Site Ekle (Benim Sitem olarak)</span>
+        </a>
+    </div>
+    {% endif %}
+    
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    async function startAnalysis(siteId, siteName) {
+        if (!confirm(`"${siteName}" için tam SEO analizi başlatılsın mı?\n\nBu işlem tüm sayfaları analiz edecek ve biraz zaman alabilir.`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/site-tools/analyze/${siteId}`, { method: 'POST' });
+            const data = await response.json();
+            
+            if (data.status === 'started') {
+                showToast('Analiz başlatıldı! Arka planda çalışıyor...', 'success');
+            } else {
+                showToast('Hata: ' + data.message, 'error');
+            }
+        } catch (error) {
+            showToast('Hata: ' + error.message, 'error');
+        }
+    }
+</script>
+{% endblock %}

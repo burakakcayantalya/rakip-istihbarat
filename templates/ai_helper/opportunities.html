@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.project_name }} - {{ page_title }}{% endblock %}
+{% block page_title %}AI Helper: {{ project.project_name }} - {{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-xl font-semibold text-gray-800 mb-2">{{ page_title }}</h2>
+                <p class="text-sm text-gray-600">Toplam {{ opportunities|length }} gap</p>
+            </div>
+            <a href="/ai-helper/project/{{ project.id }}" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                ← Dashboard'a Dön
+            </a>
+        </div>
+    </div>
+    
+    <!-- Filtreler ve Toplu İşlemler -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <div class="flex items-center justify-between flex-wrap gap-4">
+            <div class="flex items-center space-x-2">
+                <a href="/ai-helper/project/{{ project.id }}/opportunities" 
+                   class="px-4 py-2 rounded-lg text-sm transition-colors {% if not status_filter %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                    Tümü ({{ total_opportunities }})
+                </a>
+                <a href="/ai-helper/project/{{ project.id }}/opportunities?status=READY_FOR_APPROVAL" 
+                   class="px-4 py-2 rounded-lg text-sm transition-colors {% if status_filter == 'READY_FOR_APPROVAL' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                    Onay Bekleyen ({{ ready_for_approval }})
+                </a>
+                <a href="/ai-helper/project/{{ project.id }}/opportunities?status=IN_POOL" 
+                   class="px-4 py-2 rounded-lg text-sm transition-colors {% if status_filter == 'IN_POOL' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                    Havuzda ({{ in_pool }})
+                </a>
+                <a href="/ai-helper/project/{{ project.id }}/opportunities?status=APPROVED" 
+                   class="px-4 py-2 rounded-lg text-sm transition-colors {% if status_filter == 'APPROVED' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                    Onaylanan ({{ approved }})
+                </a>
+                <a href="/ai-helper/project/{{ project.id }}/opportunities?status=REJECTED" 
+                   class="px-4 py-2 rounded-lg text-sm transition-colors {% if status_filter == 'REJECTED' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                    Reddedilen ({{ rejected }})
+                </a>
+            </div>
+            {% if status_filter == 'IN_POOL' %}
+            <div class="flex items-center space-x-2">
+                <button onclick="clearAllPool()" 
+                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm">
+                    🗑️ Tümünü Temizle
+                </button>
+                <button onclick="bulkDeleteSelected()" 
+                        id="bulkDeleteBtn"
+                        class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm hidden">
+                    🗑️ Seçilenleri Sil (<span id="selectedCount">0</span>)
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Gap Listesi -->
+    {% if opportunities %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="space-y-4">
+            {% for opp in opportunities %}
+            <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                <div class="flex items-start justify-between mb-3">
+                    {% if status_filter == 'IN_POOL' %}
+                    <div class="mr-3 mt-1">
+                        <input type="checkbox" 
+                               class="opportunity-checkbox" 
+                               value="{{ opp.id }}"
+                               onchange="updateSelectedCount()">
+                    </div>
+                    {% endif %}
+                    <div class="flex-1">
+                        <div class="mb-2">
+                            <span class="text-sm text-gray-500">Kaynak:</span>
+                            <a href="{{ opp.source_url }}" target="_blank" class="text-blue-600 hover:underline ml-2 break-all">{{ opp.source_url }}</a>
+                        </div>
+                        <div class="mb-2">
+                            <span class="text-sm text-gray-500">Hedef:</span>
+                            <a href="{{ opp.target_url }}" target="_blank" class="text-indigo-600 hover:underline ml-2 break-all">{{ opp.target_url }}</a>
+                        </div>
+                        {% if opp.target_keyword %}
+                        <div class="mb-2">
+                            <span class="text-sm text-gray-500">Anchor Text:</span>
+                            <span class="text-gray-800 font-medium ml-2">{{ opp.target_keyword }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="ml-4 flex flex-col items-end space-y-2">
+                        <span class="px-3 py-1 rounded-full text-xs font-medium
+                            {% if opp.status == 'READY_FOR_APPROVAL' %}bg-yellow-100 text-yellow-800
+                            {% elif opp.status == 'IN_POOL' %}bg-blue-100 text-blue-800
+                            {% elif opp.status == 'APPROVED' %}bg-green-100 text-green-800
+                            {% elif opp.status == 'REJECTED' %}bg-red-100 text-red-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ opp.status }}
+                        </span>
+                        <span class="px-3 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">
+                            Confidence: {{ "%.0f"|format(opp.confidence_score) }}%
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Orijinal ve AI Önerisi -->
+                {% if opp.original_paragraph or opp.html_snippet %}
+                <div class="mt-4 p-4 bg-white rounded-lg border border-gray-200">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {% if opp.original_paragraph %}
+                        <div>
+                            <h4 class="text-sm font-semibold text-gray-700 mb-2">Orijinal Paragraf</h4>
+                            <div class="p-3 bg-gray-50 rounded border border-gray-200 text-sm text-gray-700 max-h-40 overflow-y-auto">
+                                {{ opp.original_paragraph|truncate(500) }}
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if opp.html_snippet %}
+                        <div>
+                            <h4 class="text-sm font-semibold text-indigo-700 mb-2">AI Önerisi (HTML)</h4>
+                            <div class="p-3 bg-indigo-50 rounded border border-indigo-200 text-sm text-gray-700 max-h-40 overflow-y-auto">
+                                <code class="text-xs whitespace-pre-wrap break-words">{{ opp.html_snippet|truncate(500) }}</code>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="flex items-center space-x-2 mt-3 pt-3 border-t border-gray-200">
+                    {% if opp.status == 'READY_FOR_APPROVAL' %}
+                    <a href="/ai-helper/project/{{ project.id }}/approval/{{ opp.id }}" 
+                       class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm">
+                        İncele ve Onayla
+                    </a>
+                    {% endif %}
+                    <button onclick="deleteOpportunity({{ opp.id }})" 
+                            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm">
+                        🗑️ Sil
+                    </button>
+                    <span class="text-xs text-gray-500">
+                        Oluşturulma: {{ opp.created_at.strftime('%d.%m.%Y %H:%M') }}
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+        <p class="text-gray-500 text-lg">Henüz gap bulunmuyor</p>
+        <p class="text-gray-400 text-sm mt-2">
+            {% if status_filter %}
+                Bu durumda gap bulunmuyor. Filtreyi değiştirmeyi deneyin.
+            {% else %}
+                Analiz başlatıldığında gap'ler burada görünecek
+            {% endif %}
+        </p>
+        <a href="/ai-helper/project/{{ project.id }}" class="inline-block mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+            Dashboard'a Dön
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+(function() {
+    'use strict';
+    
+    window.deleteOpportunity = function(opportunityId) {
+        if (!confirm('Bu opportunity\'yi silmek istediğinize emin misiniz?')) {
+            return;
+        }
+        
+        fetch('/ai-helper/opportunity/' + opportunityId, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                alert('Opportunity silindi');
+                window.location.reload();
+            } else {
+                alert('Hata: ' + data.message);
+            }
+        })
+        .catch(function(error) {
+            alert('Hata: ' + error.message);
+        });
+    };
+    
+    window.updateSelectedCount = function() {
+        var checkboxes = document.querySelectorAll('.opportunity-checkbox:checked');
+        var count = checkboxes.length;
+        var selectedCountSpan = document.getElementById('selectedCount');
+        var bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+        
+        if (selectedCountSpan) {
+            selectedCountSpan.textContent = count;
+        }
+        
+        if (bulkDeleteBtn) {
+            if (count > 0) {
+                bulkDeleteBtn.classList.remove('hidden');
+            } else {
+                bulkDeleteBtn.classList.add('hidden');
+            }
+        }
+    };
+    
+    window.clearAllPool = function() {
+        if (!confirm('Havuzdaki TÜM opportunity\'leri silmek istediğinize emin misiniz? Bu işlem geri alınamaz!')) {
+            return;
+        }
+        
+        var projectId = {{ project.id }};
+        
+        fetch('/ai-helper/project/' + projectId + '/opportunities/clear-pool', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                alert(data.message);
+                window.location.reload();
+            } else {
+                alert('Hata: ' + data.message);
+            }
+        })
+        .catch(function(error) {
+            alert('Hata: ' + error.message);
+        });
+    };
+    
+    window.bulkDeleteSelected = function() {
+        var checkboxes = document.querySelectorAll('.opportunity-checkbox:checked');
+        var selectedIds = Array.from(checkboxes).map(function(cb) { return parseInt(cb.value); });
+        
+        if (selectedIds.length === 0) {
+            alert('Lütfen en az bir opportunity seçin');
+            return;
+        }
+        
+        if (!confirm('Seçili ' + selectedIds.length + ' opportunity\'yi silmek istediğinize emin misiniz?')) {
+            return;
+        }
+        
+        var projectId = {{ project.id }};
+        
+        fetch('/ai-helper/project/' + projectId + '/opportunities/bulk-delete', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                opportunity_ids: selectedIds
+            })
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                alert(data.message);
+                window.location.reload();
+            } else {
+                alert('Hata: ' + data.message);
+            }
+        })
+        .catch(function(error) {
+            alert('Hata: ' + error.message);
+        });
+    };
+    
+    // Sayfa yüklendiğinde seçim sayısını güncelle
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', window.updateSelectedCount);
+    } else {
+        window.updateSelectedCount();
+    }
+})();
+</script>
+{% endblock %}
+

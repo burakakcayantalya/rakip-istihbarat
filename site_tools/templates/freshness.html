@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Freshness Raporu - {{ site.name }}{% endblock %}
+{% block page_title %}Freshness Raporu{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    
+    <!-- Back Button & Header -->
+    <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+            <a href="/site-tools/site/{{ site.id }}" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <div>
+                <h2 class="text-xl font-semibold text-gray-800">{{ site.name }}</h2>
+                <p class="text-sm text-gray-500">{{ freshness_days }} günden eski içerikler</p>
+            </div>
+        </div>
+        <a href="/settings" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm">
+            ⚙️ Freshness Ayarı: {{ freshness_days }} gün
+        </a>
+    </div>
+    
+    <!-- Stats Summary -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Fresh -->
+        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-5 text-white">
+            <p class="text-green-100 text-sm">Taze İçerik</p>
+            <p class="text-3xl font-bold mt-1">{{ fresh_count }}</p>
+            <p class="text-green-100 text-xs mt-1">Son {{ freshness_days }} gün içinde güncellendi</p>
+        </div>
+        
+        <!-- Stale -->
+        <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-5 text-white">
+            <p class="text-orange-100 text-sm">Eski İçerik</p>
+            <p class="text-3xl font-bold mt-1">{{ stale_count }}</p>
+            <p class="text-orange-100 text-xs mt-1">{{ freshness_days }}+ gündür güncellenmedi</p>
+        </div>
+        
+        <!-- Percentage -->
+        <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-5 text-white">
+            <p class="text-indigo-100 text-sm">Tazelik Oranı</p>
+            {% set total = fresh_count + stale_count %}
+            {% set percentage = (fresh_count / total * 100) if total > 0 else 0 %}
+            <p class="text-3xl font-bold mt-1">%{{ "%.0f"|format(percentage) }}</p>
+            <p class="text-indigo-100 text-xs mt-1">
+                {% if percentage >= 70 %}İyi durumda 👍{% elif percentage >= 50 %}Dikkat gerekli ⚠️{% else %}Acil güncelleme gerekli 🚨{% endif %}
+            </p>
+        </div>
+    </div>
+    
+    <!-- Freshness Bar -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium text-gray-700">İçerik Tazeliği</span>
+            <span class="text-sm text-gray-500">{{ fresh_count }} / {{ total }}</span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-4">
+            <div class="h-4 rounded-full bg-gradient-to-r from-green-400 to-green-600 transition-all duration-500"
+                 style="width: {{ percentage }}%"></div>
+        </div>
+        <div class="flex justify-between mt-2 text-xs text-gray-500">
+            <span>0%</span>
+            <span>50%</span>
+            <span>100%</span>
+        </div>
+    </div>
+    
+    {% if stale_pages %}
+    <!-- Stale Pages Table -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="p-4 border-b border-gray-100 bg-orange-50">
+            <h3 class="text-lg font-semibold text-orange-800">⚠️ Güncellenmesi Gereken Sayfalar</h3>
+            <p class="text-sm text-orange-600">Bu sayfalar {{ freshness_days }} günden uzun süredir güncellenmedi</p>
+        </div>
+        
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sayfa</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Yaş (Gün)</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Son Güncelleme</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Öncelik</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for item in stale_pages %}
+                    <tr class="hover:bg-gray-50">
+                        <!-- Page Info -->
+                        <td class="px-4 py-3">
+                            {% if item.page %}
+                            <p class="text-sm font-medium text-gray-800 truncate max-w-lg">
+                                {{ item.page.title or 'Başlık Yok' }}
+                            </p>
+                            <a href="{{ item.page.url }}" target="_blank" class="text-xs text-indigo-600 hover:underline truncate block max-w-lg">
+                                {{ item.page.url }}
+                            </a>
+                            {% else %}
+                            <p class="text-sm font-medium text-gray-800 truncate max-w-lg">
+                                Sitemap'te bulundu (veritabanında yok)
+                            </p>
+                            <a href="{{ item.url }}" target="_blank" class="text-xs text-indigo-600 hover:underline truncate block max-w-lg">
+                                {{ item.url }}
+                            </a>
+                            {% endif %}
+                        </td>
+                        
+                        <!-- Age -->
+                        <td class="px-4 py-3 text-center">
+                            <span class="text-lg font-bold 
+                                {% if item.age_days > 90 %}text-red-600
+                                {% elif item.age_days > 60 %}text-orange-600
+                                {% else %}text-yellow-600{% endif %}">
+                                {{ item.age_days }}
+                            </span>
+                            <span class="text-xs text-gray-500 ml-1">gün</span>
+                        </td>
+                        
+                        <!-- Last Update -->
+                        <td class="px-4 py-3 text-center">
+                            {% if item.effective_date %}
+                            <span class="text-sm text-gray-600">
+                                {{ item.effective_date.strftime('%d.%m.%Y') }}
+                            </span>
+                            {% else %}
+                            <span class="text-sm text-gray-400">Bilinmiyor</span>
+                            {% endif %}
+                        </td>
+                        
+                        <!-- Priority -->
+                        <td class="px-4 py-3 text-center">
+                            {% if item.age_days > 90 %}
+                            <span class="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">
+                                🔴 Kritik
+                            </span>
+                            {% elif item.age_days > 60 %}
+                            <span class="px-2 py-1 bg-orange-100 text-orange-700 text-xs font-medium rounded-full">
+                                🟠 Yüksek
+                            </span>
+                            {% else %}
+                            <span class="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs font-medium rounded-full">
+                                🟡 Normal
+                            </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <!-- All Fresh -->
+    <div class="bg-green-50 rounded-xl p-8 text-center border border-green-200">
+        <div class="text-5xl mb-4">🎉</div>
+        <h3 class="text-xl font-semibold text-green-800">Tebrikler!</h3>
+        <p class="text-green-600 mt-2">Tüm içerikleriniz son {{ freshness_days }} gün içinde güncel.</p>
+    </div>
+    {% endif %}
+    
+</div>
+{% endblock %}

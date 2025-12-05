@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+
+{% block title %}Dispatcher Agent - Dashboard{% endblock %}
+
+{% block page_title %}Dispatcher Agent - Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900">Dispatcher Agent</h2>
+                <p class="text-gray-600 mt-1">Görevleri alır ve uygun agent'lara dağıtır (Hub)</p>
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="processReviewerQueue()" 
+                        class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                    🔄 Reviewer Kuyruğunu İşle
+                </button>
+                <button onclick="assignPendingTasks()" 
+                        class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                    📤 Bekleyen Görevleri Ata
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- İstatistikler -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <!-- Bekleyenler -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Bekleyenler</h3>
+                <svg class="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-yellow-600">{{ total_pending }}</div>
+            <p class="text-sm text-gray-500 mt-2">Atanmayı bekleyen görevler</p>
+        </div>
+        
+        <!-- Atanmışlar -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Atanmışlar</h3>
+                <svg class="w-8 h-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-purple-600">{{ total_assigned }}</div>
+            <p class="text-sm text-gray-500 mt-2">Agent'lara atanmış görevler</p>
+        </div>
+        
+        <!-- İşlenmekte -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">İşlenmekte</h3>
+                <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-blue-600">{{ total_in_progress }}</div>
+            <p class="text-sm text-gray-500 mt-2">Şu anda işlenen görevler</p>
+        </div>
+        
+        <!-- Tamamlananlar -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Tamamlananlar</h3>
+                <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="text-4xl font-bold text-green-600">{{ total_completed }}</div>
+            <p class="text-sm text-gray-500 mt-2">Tamamlanmış görevler</p>
+        </div>
+    </div>
+    
+    <!-- Agent Bazında İstatistikler -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Agent Bazında İstatistikler</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for agent, stats in agent_stats.items() %}
+            <div class="border border-gray-200 rounded-lg p-4">
+                <h4 class="font-semibold text-gray-900 mb-2">{{ agent }}</h4>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Bekleyen:</span>
+                        <span class="font-semibold text-yellow-600">{{ stats.pending }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">İşlenmekte:</span>
+                        <span class="font-semibold text-blue-600">{{ stats.in_progress }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Tamamlanan:</span>
+                        <span class="font-semibold text-green-600">{{ stats.completed }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Bekleyen Görevler -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Bekleyen Görevler (Öncelik Sırasına Göre)</h3>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Öncelik</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Görev Adı</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Görev Tipi</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Atanacak Agent</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sayfa</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% if pending_tasks %}
+                        {% for task in pending_tasks %}
+                        <tr>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full
+                                    {% if task.priority >= 8 %}bg-red-100 text-red-800
+                                    {% elif task.priority >= 5 %}bg-orange-100 text-orange-800
+                                    {% elif task.priority >= 3 %}bg-yellow-100 text-yellow-800
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {{ task.priority }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ task.task_name }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ task.task_type }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                                    {% if task.assigned_agent %}{{ task.assigned_agent.value }}{% else %}Belirlenmedi{% endif %}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-500">
+                                {% if task.page_url %}
+                                <a href="{{ task.page_url }}" target="_blank" class="text-indigo-600 hover:underline">
+                                    {{ task.page_url[:40] }}{% if task.page_url|length > 40 %}...{% endif %}
+                                </a>
+                                {% else %}
+                                <span class="text-gray-400">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm">
+                                {% if task.assigned_agent %}
+                                <button onclick="assignTask({{ task.id }})" 
+                                        class="text-indigo-600 hover:text-indigo-900">
+                                    📤 Ata
+                                </button>
+                                {% else %}
+                                <span class="text-gray-400">Agent belirlenmedi</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="px-4 py-3 text-center text-sm text-gray-500">Bekleyen görev yok</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Atanmış Görevler -->
+    {% if assigned_tasks %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Atanmış Görevler</h3>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Görev</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agent</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Atanma Tarihi</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for task in assigned_tasks %}
+                    <tr>
+                        <td class="px-4 py-3 text-sm text-gray-900">{{ task.task_name }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                                {% if task.assigned_agent %}{{ task.assigned_agent.value }}{% else %}-{% endif %}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {{ task.assigned_at.strftime('%d.%m.%Y %H:%M') if task.assigned_at else '-' }}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                                {{ task.status.value }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- İşlenmekte Olanlar -->
+    {% if in_progress_tasks %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">İşlenmekte Olanlar</h3>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Görev</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agent</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Başlangıç</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for task in in_progress_tasks %}
+                    <tr>
+                        <td class="px-4 py-3 text-sm text-gray-900">{{ task.task_name }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                                {% if task.assigned_agent %}{{ task.assigned_agent.value }}{% else %}-{% endif %}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {{ task.started_at.strftime('%d.%m.%Y %H:%M') if task.started_at else '-' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+async function processReviewerQueue() {
+    if (!confirm('Reviewer kuyruğundaki öğeleri Dispatcher görevlerine dönüştürmek istediğinize emin misiniz?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/agents/dispatcher/api/process-reviewer-queue', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            alert(`✅ ${result.count} görev oluşturuldu!`);
+            window.location.reload();
+        } else {
+            alert('❌ Hata: ' + (result.message || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Bir hata oluştu');
+    }
+}
+
+async function assignPendingTasks() {
+    if (!confirm('Tüm bekleyen görevleri agent\'lara atamak istediğinize emin misiniz?')) {
+        return;
+    }
+    
+    // Bekleyen tüm görevleri al ve ata
+    try {
+        const response = await fetch('/agents/dispatcher/api/tasks?status=PENDING&limit=100');
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            let assignedCount = 0;
+            let errorCount = 0;
+            
+            for (const task of result.tasks) {
+                if (task.assigned_agent) {
+                    try {
+                        const assignResponse = await fetch(`/agents/dispatcher/api/tasks/${task.id}/assign`, {
+                            method: 'POST'
+                        });
+                        const assignResult = await assignResponse.json();
+                        
+                        if (assignResult.status === 'success') {
+                            assignedCount++;
+                        } else {
+                            errorCount++;
+                        }
+                    } catch (error) {
+                        errorCount++;
+                    }
+                }
+            }
+            
+            alert(`✅ ${assignedCount} görev atandı${errorCount > 0 ? `, ${errorCount} hata` : ''}`);
+            window.location.reload();
+        } else {
+            alert('❌ Hata: ' + (result.message || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Bir hata oluştu');
+    }
+}
+
+async function assignTask(taskId) {
+    try {
+        const response = await fetch(`/agents/dispatcher/api/tasks/${taskId}/assign`, {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            alert(`✅ Görev ${result.agent} agent'ına atandı!`);
+            window.location.reload();
+        } else {
+            alert('❌ Hata: ' + (result.message || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Bir hata oluştu');
+    }
+}
+</script>
+{% endblock %}
+

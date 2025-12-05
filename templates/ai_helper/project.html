@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.project_name }} - AI Helper Dashboard{% endblock %}
+{% block page_title %}AI Helper: {{ project.project_name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="{ 
+    logLevel: 'ALL',
+    logModule: 'ALL',
+    logs: [],
+    loadingLogs: false,
+    autoRefresh: true,
+    loadLogs: function() {
+        this.loadingLogs = true;
+        const projectId = {{ project.id }};
+        let url = '/ai-helper/project/' + projectId + '/logs?limit=200';
+        if (this.logLevel !== 'ALL') {
+            url += '&level=' + this.logLevel;
+        }
+        if (this.logModule !== 'ALL') {
+            url += '&module=' + this.logModule;
+        }
+        
+        fetch(url)
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                const oldLength = this.logs.length;
+                // Logları ters sırada göster (en yeni en altta)
+                this.logs = data.logs.map(function(log) {
+                    const date = new Date(log.created_at);
+                    log.created_at = date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    return log;
+                }.bind(this)).reverse();
+                
+                if (this.logs.length > oldLength) {
+                    setTimeout(function() {
+                        const container = document.getElementById('logContainer');
+                        if (container) {
+                            container.scrollTop = container.scrollHeight;
+                        }
+                    }.bind(this), 100);
+                }
+            }
+            this.loadingLogs = false;
+        }.bind(this))
+        .catch(function(error) {
+            console.error('Log yükleme hatası:', error);
+            this.loadingLogs = false;
+        }.bind(this));
+    },
+    clearLogs: function() {
+        // Logları tamamen temizle
+        this.logs = [];
+        // Auto-refresh'i geçici olarak durdur
+        this.autoRefresh = false;
+        // 2 saniye sonra auto-refresh'i tekrar başlat (yeni loglar için)
+        setTimeout(function() {
+            this.autoRefresh = true;
+        }.bind(this), 2000);
+    },
+}" x-init="
+    loadLogs();
+    let refreshInterval = null;
+    if (autoRefresh) {
+        refreshInterval = setInterval(function() { 
+            if (this.autoRefresh) {
+                loadLogs(); 
+            }
+            // Her yüklemede en alta scroll yap (sadece auto-refresh aktifse)
+            setTimeout(function() {
+                const container = document.getElementById('logContainer');
+                if (container && this.autoRefresh) {
+                    container.scrollTop = container.scrollHeight;
+                }
+            }.bind(this), 100);
+        }.bind(this), 3000);
+    }
+">
+    
+    <!-- Header -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="flex items-center space-x-3 mb-2">
+                    <h2 class="text-xl font-semibold text-gray-800">{{ project.project_name }}</h2>
+                    {% if project.status == "active" %}
+                    <span class="px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">Aktif</span>
+                    {% endif %}
+                </div>
+                <div class="flex items-center space-x-4 text-sm text-gray-600">
+                    <span>📅 Oluşturulma: {{ project.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+                    <span>🤖 AI: {{ project.ai_provider|upper }} / {{ project.ai_model }}</span>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="startAnalysis()" 
+                        class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                    🔄 Analize Başla
+                </button>
+                <a href="/ai-helper" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                    ← Geri
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- İstatistikler -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <a href="/ai-helper/project/{{ project.id }}/opportunities" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow cursor-pointer">
+            <div class="text-sm font-medium text-gray-600 mb-1">Toplam Gap</div>
+            <div class="text-2xl font-bold text-gray-800">{{ total_opportunities }}</div>
+        </a>
+        <a href="/ai-helper/project/{{ project.id }}/opportunities?status=READY_FOR_APPROVAL" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow cursor-pointer">
+            <div class="text-sm font-medium text-gray-600 mb-1">Onay Bekleyen</div>
+            <div class="text-2xl font-bold text-indigo-600">{{ ready_for_approval }}</div>
+        </a>
+        <a href="/ai-helper/project/{{ project.id }}/opportunities?status=IN_POOL" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow cursor-pointer">
+            <div class="text-sm font-medium text-gray-600 mb-1">Havuzda</div>
+            <div class="text-2xl font-bold text-blue-600">{{ in_pool }}</div>
+        </a>
+        <a href="/ai-helper/project/{{ project.id }}/clusters" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow cursor-pointer">
+            <div class="text-sm font-medium text-gray-600 mb-1">Kümeler</div>
+            <div class="text-2xl font-bold text-purple-600">{{ total_clusters }}</div>
+        </a>
+    </div>
+    
+    <!-- Onay Bekleyenler -->
+    {% if pending_approvals %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Onay Bekleyenler</h3>
+        <div class="space-y-4">
+            {% for opp in pending_approvals %}
+            <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <span class="font-semibold text-gray-800">{{ opp.source_url }}</span>
+                        <span class="text-gray-500">→</span>
+                        <span class="text-indigo-600">{{ opp.target_url }}</span>
+                    </div>
+                    <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                        Confidence: {{ "%.0f"|format(opp.confidence_score) }}%
+                    </span>
+                </div>
+                <div class="flex items-center space-x-2 mt-3">
+                    <a href="/ai-helper/project/{{ project.id }}/approval/{{ opp.id }}" 
+                       class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm">
+                        İncele ve Onayla
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    
+    <!-- Log İzleme Ekranı -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-800">📋 Log İzleme Ekranı</h3>
+            <div class="flex items-center space-x-2">
+                <select x-model="logLevel" @change="loadLogs()" 
+                        class="px-3 py-1 border border-gray-300 rounded-lg text-sm">
+                    <option value="ALL">Tüm Seviyeler</option>
+                    <option value="INFO">INFO</option>
+                    <option value="SUCCESS">SUCCESS</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="ERROR">ERROR</option>
+                </select>
+                <select x-model="logModule" @change="loadLogs()" 
+                        class="px-3 py-1 border border-gray-300 rounded-lg text-sm">
+                    <option value="ALL">Tüm Modüller</option>
+                    <option value="STRATEGIST">STRATEGIST</option>
+                    <option value="SCHEDULER">SCHEDULER</option>
+                    <option value="EDITOR">EDITOR</option>
+                    <option value="WORDPRESS">WORDPRESS</option>
+                </select>
+                <button @click="clearLogs()" 
+                        class="px-4 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm">
+                    🗑️ Temizle
+                </button>
+                <button @click="loadLogs()" 
+                        :disabled="loadingLogs"
+                        class="px-4 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm">
+                    <span x-show="!loadingLogs">🔄 Yenile</span>
+                    <span x-show="loadingLogs">⏳ Yükleniyor...</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="bg-gray-900 text-green-400 font-mono text-sm p-4 rounded-lg max-h-[500px] overflow-y-auto break-words" 
+             id="logContainer">
+            <template x-for="log in logs" :key="log.id">
+                <div :class="{
+                    'text-green-400': log.level === 'SUCCESS',
+                    'text-yellow-400': log.level === 'WARNING',
+                    'text-red-400': log.level === 'ERROR',
+                    'text-blue-400': log.level === 'INFO',
+                    'text-gray-400': !log.level || log.level === 'ALL'
+                }" class="py-1.5 border-b border-gray-800 last:border-b-0">
+                    <div class="flex items-start gap-2">
+                        <span class="text-gray-500 flex-shrink-0 text-xs">[<span x-text="log.created_at"></span>]</span>
+                        <span class="font-bold flex-shrink-0 text-xs px-1" x-text="log.level"></span>
+                        <span class="text-gray-600 flex-shrink-0 text-xs">[<span x-text="log.module"></span>]</span>
+                        <span class="flex-1 leading-relaxed" x-text="log.message"></span>
+                    </div>
+                    <template x-if="log.details && Object.keys(log.details).length > 0">
+                        <div class="mt-1 ml-16 text-gray-500 text-xs leading-relaxed">
+                            <template x-for="(value, key) in log.details" :key="key">
+                                <div class="mb-1">
+                                    <span class="text-gray-600 font-semibold" x-text="key + ': '"></span>
+                                    <template x-if="key === 'prompt' || key === 'response'">
+                                        <div class="mt-1 p-2 bg-gray-800 rounded text-gray-300 font-mono text-xs whitespace-pre-wrap break-words max-h-40 overflow-y-auto">
+                                            <span x-text="value"></span>
+                                        </div>
+                                    </template>
+                                    <template x-if="key !== 'prompt' && key !== 'response'">
+                                        <span class="text-gray-400" x-text="typeof value === 'object' ? JSON.stringify(value) : value"></span>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </template>
+            <div x-show="logs.length === 0 && !loadingLogs" class="text-gray-500 text-center py-8 text-sm">
+                Henüz log kaydı yok. Analiz başlatıldığında loglar burada görünecek.
+            </div>
+            <div x-show="loadingLogs" class="text-gray-500 text-center py-4 text-sm">
+                ⏳ Loglar yükleniyor...
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+    
+    window.startAnalysis = function() {
+        const projectId = {{ project.id }};
+        
+        if (!confirm('Analizi başlatmak istediğinize emin misiniz?\n\nLoglar temizlenecektir.')) {
+            return;
+        }
+        
+        // Logları temizle
+        try {
+            const app = document.querySelector('[x-data]');
+            if (app && app.__x && app.__x.$data && app.__x.$data.clearLogs) {
+                app.__x.$data.clearLogs();
+            }
+        } catch(e) {
+            console.log('Log temizleme hatası:', e);
+        }
+        
+        fetch('/ai-helper/project/' + projectId + '/start-analysis', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                alert(data.message);
+                // Sayfayı yenile
+                setTimeout(function() {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                alert('Hata: ' + data.message);
+            }
+        })
+        .catch(function(error) {
+            alert('Hata: ' + error.message);
+        });
+    };
+    
+})();
+</script>
+{% endblock %}
+
