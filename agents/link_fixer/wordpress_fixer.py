@@ -635,7 +635,7 @@ class WordPressAPILinkFixer:
                     if php_changes == 0:
                         logs.append({"message": f"⚠️ Endpoint 0 değişiklik bildirdi - link zaten değiştirilmiş olabilir", "type": "warning"})
                         logs.append({"message": f"🔍 Sayfa kontrol ediliyor: old_url var mı, new_url var mı?", "type": "info"})
-                        
+            
                         # Sayfayı oku ve kontrol et
                         try:
                             success, elementor_json = await self.get_elementor_data(post_id, post_type=post_type, logs=logs)
@@ -780,12 +780,12 @@ class WordPressAPILinkFixer:
                     logs.append({"message": f"❌ Elementor Native Replace başarısız (HTTP {response.status_code})", "type": "error"})
                     logs.append({"message": f"   Hata: {error_msg}", "type": "error"})
                     
-                    return {
+            return {
                         "success": False,
                         "message": f"WordPress endpoint hatası: HTTP {response.status_code} - {error_msg}",
                         "changes_count": 0,
-                        "logs": logs
-                    }
+                "logs": logs
+            }
         except httpx.TimeoutException:
             logs.append({"message": f"❌ İstek zaman aşımına uğradı (30 saniye)", "type": "error"})
             return {
@@ -799,11 +799,11 @@ class WordPressAPILinkFixer:
             logs.append({"message": f"❌ Elementor Native Replace hatası: {error_msg}", "type": "error"})
             logs.append({"message": f"   Endpoint: {native_replace_url}", "type": "error"})
             logs.append({"message": f"   Authentication: Application Password kullanılıyor", "type": "info"})
-            
-            return {
+        
+        return {
                 "success": False,
                 "message": f"WordPress endpoint hatası: {error_msg}",
                 "changes_count": 0,
-                "logs": logs
-            }
+            "logs": logs
+        }
 

@@ -35,6 +35,7 @@ from agents.controller.router import router as controller_router
 from agents.controller.models import init_controller_tables
 from agents.global_task import init_global_task_tables
 from agents.reporter.router import router as reporter_router
+from agents.router import router as agents_shared_router
 
 
 # ============================================
@@ -285,6 +286,7 @@ app.include_router(site_tools_router)
 app.include_router(entity_analyzer_router)
 app.include_router(entity_finder_router)
 app.include_router(ai_helper_router)
+app.include_router(agents_shared_router)  # Ortak agent endpoint'leri (site seçimi vb.)
 app.include_router(observer_router)
 app.include_router(reviewer_router)
 app.include_router(dispatcher_router)

@@ -7,6 +7,19 @@
  */
 
 add_action('rest_api_init', function () {
+    
+    // 0. TEST ENDPOINT - Endpoint'in çalışıp çalışmadığını kontrol et
+    register_rest_route('custom/v1', '/test', array(
+        'methods' => 'GET',
+        'permission_callback' => '__return_true',
+        'callback' => function ($request) {
+            return array(
+                'success' => true,
+                'message' => 'Custom endpoint çalışıyor!',
+                'timestamp' => current_time('mysql')
+            );
+        },
+    ));
 
     // 1. İZİN: Python'un Elementor verisini OKUMASINI sağlar
     register_rest_field(['page', 'post'], '_elementor_data', array(
@@ -22,26 +35,28 @@ add_action('rest_api_init', function () {
         'methods' => 'POST',
         'permission_callback' => function ($request) {
             // REST API authentication kontrolü
-            // Application Password veya Basic Auth ile gelen istekleri kabul et
-            $user = wp_authenticate_application_password(null, $request->get_header('Authorization'));
+            $user = null;
             
-            if (is_wp_error($user)) {
-                // Basic Auth dene
-                $user = wp_authenticate($request->get_param('username'), $request->get_param('password'));
+            // Önce Basic Auth header'dan username:password çıkar
+            $auth_header = $request->get_header('Authorization');
+            if ($auth_header && strpos($auth_header, 'Basic ') === 0) {
+                $credentials = base64_decode(substr($auth_header, 6));
+                list($username, $password) = explode(':', $credentials, 2);
+                if ($username && $password) {
+                    $user = wp_authenticate($username, $password);
+                }
             }
+            
+            // Application Password desteği kaldırıldı - sadece Basic Auth kullanılıyor
+            // (WordPress sürüm uyumsuzlukları nedeniyle)
             
             // Eğer hala user yoksa, REST API nonce kontrolü yap
             if (!$user || is_wp_error($user)) {
-                // REST API nonce kontrolü (eğer cookie authentication kullanılıyorsa)
                 $user_id = wp_validate_auth_cookie();
                 if ($user_id) {
                     $user = get_user_by('ID', $user_id);
                 }
             }
-            
-            // Son çare: Herkese açık yap (GÜVENLİK RİSKİ - sadece test için)
-            // PRODUCTION'DA BUNU KALDIRIN VE YUKARIDAKİ AUTHENTICATION'I KULLANIN!
-            // return true; // ⚠️ GÜVENLİK RİSKİ - SADECE TEST İÇİN
             
             // Normal kullanım: User varsa ve edit_posts yetkisi varsa izin ver
             if ($user && !is_wp_error($user)) {
@@ -178,7 +193,7 @@ add_action('rest_api_init', function () {
             }
             
             // CSS Cache Temizle (Bozulmayı önleyen kısım)
-            if (method_exists('\Elementor\Plugin', '$instance')) {
+            if (class_exists('\Elementor\Plugin') && isset(\Elementor\Plugin::$instance)) {
                 try {
                     \Elementor\Plugin::$instance->files_manager->clear_cache();
                 } catch (Exception $e) {
@@ -242,5 +257,132 @@ add_action('rest_api_init', function () {
             // --- Fonksiyon Bitişi ---
         },
     ));
+    
+    // 3. Elementor Content Update Endpoint'i (BASİT VERSİYON)
+    register_rest_route('custom/v1', '/update-elementor-page', array(
+        'methods' => 'POST',
+        'callback' => 'update_elementor_page',
+        'permission_callback' => function ($request) {
+            // REST API authentication kontrolü
+            $user = null;
+            
+            // Önce Basic Auth header'dan username:password çıkar
+            $auth_header = $request->get_header('Authorization');
+            if ($auth_header && strpos($auth_header, 'Basic ') === 0) {
+                $credentials = base64_decode(substr($auth_header, 6));
+                list($username, $password) = explode(':', $credentials, 2);
+                if ($username && $password) {
+                    $user = wp_authenticate($username, $password);
+                    if ($user && !is_wp_error($user)) {
+                        wp_set_current_user($user->ID);
+                    }
+                }
+            }
+            
+            // Cookie-based authentication
+            if (!$user || is_wp_error($user)) {
+                $user_id = wp_validate_auth_cookie();
+                if ($user_id) {
+                    wp_set_current_user($user_id);
+                }
+            }
+            
+            // Permission kontrolü
+            return current_user_can('edit_pages');
+        },
+        'args' => array(
+            'post_id' => array(
+                'required' => true,
+                'type' => 'integer',
+            ),
+            'elementor_data' => array(
+                'required' => true,
+                'type' => 'string',
+            ),
+        ),
+    ));
 });
+
+// Elementor Page Update Fonksiyonu
+function update_elementor_page(WP_REST_Request $request) {
+    $post_id = $request->get_param('post_id');
+    $elementor_data = $request->get_param('elementor_data');
+    
+    if (empty($post_id) || empty($elementor_data)) {
+        return new WP_Error('missing_params', 'Post ID veya Elementor data eksik.', array('status' => 400));
+    }
+    
+    // Elementor kontrolü
+    if (!class_exists('\Elementor\Plugin')) {
+        return new WP_Error('elementor_missing', 'Elementor yüklü değil.', array('status' => 500));
+    }
+    
+    // Meta'yı güncelle (JSON string olarak saklanır)
+    // wp_slash önemli - JSON escape için
+    $updated = update_post_meta($post_id, '_elementor_data', wp_slash($elementor_data));
+    
+    // update_post_meta false dönebilir (değer aynıysa), bu hata değil
+    // Ama gerçek bir hata olup olmadığını kontrol et
+    if ($updated === false) {
+        $existing = get_post_meta($post_id, '_elementor_data', true);
+        if ($existing === false) {
+            // Meta hiç yoksa, ekle
+            $added = add_post_meta($post_id, '_elementor_data', wp_slash($elementor_data), true);
+            if (!$added) {
+                return new WP_Error('update_failed', 'Elementor data eklenemedi.', array('status' => 500));
+            }
+        } elseif ($existing !== $elementor_data) {
+            // Meta var ama farklı, güncelleme başarısız
+            return new WP_Error('update_failed', 'Elementor data güncellenemedi.', array('status' => 500));
+        }
+    }
+    
+    // Post'u güncelle (cache temizleme için)
+    wp_update_post(array(
+        'ID' => $post_id,
+        'post_modified' => current_time('mysql'),
+        'post_modified_gmt' => current_time('mysql', 1)
+    ));
+    
+    // Elementor CSS'ini yenile
+    if (class_exists('\Elementor\Plugin') && isset(\Elementor\Plugin::$instance)) {
+        try {
+            \Elementor\Plugin::$instance->files_manager->clear_cache();
+        } catch (Exception $e) {
+            error_log('Elementor cache temizleme hatası: ' . $e->getMessage());
+        }
+    }
+    
+    // WordPress Genel Cache Temizle
+    try {
+        if (function_exists('wp_cache_flush')) {
+            wp_cache_flush();
+        }
+        
+        if (function_exists('wp_cache_post_change')) {
+            wp_cache_post_change($post_id);
+        }
+        
+        if (function_exists('w3tc_flush_post')) {
+            w3tc_flush_post($post_id);
+        }
+        
+        if (function_exists('rocket_clean_post')) {
+            rocket_clean_post($post_id);
+        }
+        
+        if (class_exists('\LiteSpeed\Purge')) {
+            \LiteSpeed\Purge::purge_post($post_id);
+        }
+    } catch (Exception $e) {
+        error_log('WordPress cache temizleme hatası: ' . $e->getMessage());
+    }
+    
+    return array(
+        'success' => true,
+        'message' => 'Sayfa Elementor verisi güncellendi.',
+        'post_id' => $post_id,
+        'cache_cleared' => true
+    );
+}
 

@@ -59,6 +59,8 @@
         openSiteMenus: {},
         aiHelperProjects: [],
         selectedAgentSite: null,
+        agentSites: [],  // Agent'lar için bizim sitelerimiz
+        selectedAgentSiteId: null,  // Seçilen site ID
         currentPath: window.location.pathname
     }" 
          x-init="
@@ -83,14 +85,58 @@
                     }
                 }
             }).catch(function() {});
-            // Seçilen agent site'ini çek
-            fetch('/agents/observer/api/selected-site').then(r => r.json()).then(data => {
+            // Agent sitelerini ve seçilen site'i çek
+            fetch('/agents/api/my-sites').then(r => r.json()).then(data => {
+                if (data.status === 'success') {
+                    agentSites = data.sites || [];
+                }
+            }).catch(function() {});
+            fetch('/agents/api/selected-site').then(r => r.json()).then(data => {
                 if (data.status === 'success' && data.site) {
                     selectedAgentSite = data.site.name;
+                    selectedAgentSiteId = data.site.id;
                 }
             }).catch(function() {});
          "
          class="flex h-screen overflow-hidden">
+         
+         <script>
+         // Agent site seçim fonksiyonu (global scope)
+         window.selectAgentSite = function(siteId) {
+             if (!siteId) return;
+             
+             fetch('/agents/api/select-site', {
+                 method: 'POST',
+                 headers: {
+                     'Content-Type': 'application/json',
+                 },
+                 body: JSON.stringify({ site_id: parseInt(siteId) })
+             })
+             .then(r => r.json())
+             .then(data => {
+                 if (data.status === 'success') {
+                     // Alpine.js data'yı güncelle (güvenli erişim)
+                     const alpineElement = document.querySelector('[x-data]');
+                     if (alpineElement && alpineElement.__x && alpineElement.__x.$data) {
+                         const alpineData = alpineElement.__x.$data;
+                         alpineData.selectedAgentSite = data.site.name;
+                         alpineData.selectedAgentSiteId = data.site.id;
+                     }
+                     
+                     // Sayfayı yenile (agent sayfaları seçilen site'e göre çalışır)
+                     if (window.location.pathname.startsWith('/agents/')) {
+                         window.location.reload();
+                     }
+                 } else {
+                     alert('Site seçilirken hata: ' + (data.message || 'Bilinmeyen hata'));
+                 }
+             })
+             .catch(error => {
+                 console.error('Error:', error);
+                 alert('Site seçilirken hata oluştu');
+             });
+         };
+         </script>
         
         <!-- Sidebar -->
         <aside :class="sidebarOpen ? 'w-64' : 'w-20'" 
@@ -329,6 +375,21 @@
                     
                     <!-- Sub Menu -->
                     <div x-show="agentsMenuOpen" x-collapse class="ml-4 mt-1 space-y-1">
+                        <!-- Site Seçim Dropdown -->
+                        <div class="px-4 py-2 mb-2 border-b border-gray-700">
+                            <label class="block text-xs text-gray-400 mb-1">Seçili Site:</label>
+                            <select x-model="selectedAgentSiteId" 
+                                    @change="selectAgentSite(selectedAgentSiteId)"
+                                    class="w-full bg-gray-800 text-white text-sm rounded-lg px-3 py-1.5 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                                <option value="">Site Seçin...</option>
+                                <template x-for="site in agentSites" :key="site.id">
+                                    <option :value="site.id" x-text="site.name"></option>
+                                </template>
+                            </select>
+                            <div x-show="selectedAgentSite" class="mt-1 text-xs text-gray-500">
+                                <span x-text="selectedAgentSite"></span>
+                            </div>
+                        </div>
                         <a href="/agents/observer" 
                            :class="currentPath.includes('/agents/observer') ? 'bg-indigo-600 text-white' : 'hover:bg-gray-800 text-gray-300'"
                            class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors text-sm">

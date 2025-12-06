@@ -12,6 +12,7 @@ from typing import Optional, List
 from pathlib import Path
 
 from core.database import get_db, Site, Page, get_setting, set_setting
+from agents import get_selected_agent_site_id, save_selected_agent_site
 from .models import (
     ObserverTask, ObserverReport, ObserverRule,
     TaskStatus, TaskType, ReportSeverity,
@@ -44,50 +45,14 @@ def ensure_tables():
 
 def get_selected_site_id(request: Request, db: Session = None) -> Optional[int]:
     """
-    Seçilen site ID'sini al (Database öncelikli, cookie fallback)
+    Seçilen site ID'sini al (Ortak agent sistemi kullanır)
     """
-    # Önce database'den al (kalıcı çözüm)
-    if db:
-        try:
-            site_id_str = get_setting(db, "OBSERVER_SELECTED_SITE_ID")
-            if site_id_str:
-                try:
-                    site_id = int(site_id_str)
-                    if site_id > 0:
-                        # Site'in hala var olduğunu kontrol et
-                        site = db.query(Site).filter(
-                            Site.id == site_id,
-                            Site.is_competitor == False,
-                            Site.is_active == True
-                        ).first()
-                        if site:
-                            return site_id
-                except (ValueError, TypeError):
-                    pass
-        except Exception:
-            pass
-    
-    # Database'de yoksa cookie'den al (fallback)
-    selected_site_id = request.cookies.get("agents_selected_site_id")
-    if selected_site_id:
-        try:
-            site_id = int(selected_site_id)
-            if site_id > 0:
-                return site_id
-        except (ValueError, TypeError):
-            pass
-    
-    return None
+    return get_selected_agent_site_id(request, db)
 
 
 def save_selected_site(db: Session, site_id: int) -> bool:
-    """Seçilen site'i database'e kaydet (kalıcı)"""
-    try:
-        set_setting(db, "OBSERVER_SELECTED_SITE_ID", str(site_id))
-        return True
-    except Exception as e:
-        print(f"⚠️ Site seçimi kaydedilemedi: {e}")
-        return False
+    """Seçilen site'i database'e kaydet (Ortak agent sistemi kullanır)"""
+    return save_selected_agent_site(db, site_id)
 
 
 def clear_selected_site(db: Session = None, response: RedirectResponse = None) -> Optional[RedirectResponse]:

@@ -110,15 +110,15 @@ async def reporter_dashboard(request: Request, db: Session = Depends(get_db)):
         main_templates = Jinja2Templates(directory=str(settings.TEMPLATES_DIR))
 
         try:
-        return main_templates.TemplateResponse(
-            "base.html",
-            {
-                "request": request,
-                "current_page": None,
-                "error": f"Dashboard yüklenirken hata oluştu: {error_msg}<br><pre>{error_trace}</pre>"
-            },
-            status_code=500
-        )
+            return main_templates.TemplateResponse(
+                "base.html",
+                {
+                    "request": request,
+                    "current_page": None,
+                    "error": f"Dashboard yüklenirken hata oluştu: {error_msg}<br><pre>{error_trace}</pre>"
+                },
+                status_code=500
+            )
         except Exception as template_error:
             print(f"❌ Error template render hatası: {template_error}")
             from fastapi.responses import HTMLResponse
@@ -351,10 +351,10 @@ def build_story_timeline(db: Session, controller_task: ControllerTask) -> list:
     
     # Eğer dispatcher_task_id ile bulunamadıysa, page_url ve rule_name ile ara
     if not reviewer_item:
-    reviewer_item = db.query(ReviewerQueue).filter(
-        ReviewerQueue.page_url == controller_task.page_url,
-        ReviewerQueue.rule_name.like(f"%{controller_task.task_type}%")
-    ).first()
+        reviewer_item = db.query(ReviewerQueue).filter(
+            ReviewerQueue.page_url == controller_task.page_url,
+            ReviewerQueue.rule_name.like(f"%{controller_task.task_type}%")
+        ).first()
 
     if reviewer_item:
         timeline.append({
@@ -393,10 +393,10 @@ def build_story_timeline(db: Session, controller_task: ControllerTask) -> list:
         
         # Eğer dispatcher_task_id ile bulunamadıysa, page_url ve task_type ile ara
         if not dispatcher_task:
-    dispatcher_task = db.query(DispatcherTask).filter(
-        DispatcherTask.page_url == controller_task.page_url,
-        DispatcherTask.task_type == controller_task.task_type
-    ).first()
+            dispatcher_task = db.query(DispatcherTask).filter(
+                DispatcherTask.page_url == controller_task.page_url,
+                DispatcherTask.task_type == controller_task.task_type
+            ).first()
 
     if dispatcher_task:
         timeline.append({
@@ -437,9 +437,9 @@ def build_story_timeline(db: Session, controller_task: ControllerTask) -> list:
             
             # Eğer agent_task_id ile bulunamadıysa, page_url ile ara
             if not link_fix_task:
-        link_fix_task = db.query(LinkFixTask).filter(
-            LinkFixTask.page_url == controller_task.page_url
-        ).order_by(desc(LinkFixTask.created_at)).first()
+                link_fix_task = db.query(LinkFixTask).filter(
+                    LinkFixTask.page_url == controller_task.page_url
+                ).order_by(desc(LinkFixTask.created_at)).first()
 
         if link_fix_task:
             timeline.append({
@@ -550,23 +550,23 @@ def build_story_timeline(db: Session, controller_task: ControllerTask) -> list:
         )
         
         if not already_added:
-        verification_task = db.query(ObserverTask).filter(
-            ObserverTask.id == controller_task.observer_task_id
-        ).first()
+            verification_task = db.query(ObserverTask).filter(
+                ObserverTask.id == controller_task.observer_task_id
+            ).first()
 
-        if verification_task:
-            timeline.append({
+            if verification_task:
+                timeline.append({
                     "step": 7,
-                "agent": "Observer",
-                "action": "Doğrulama Taraması",
-                "status": verification_task.status.value,
-                "timestamp": verification_task.created_at,
-                "details": {
-                    "description": verification_task.description,
-                    "progress": f"{verification_task.progress_percentage}%",
-                    "completed_at": verification_task.completed_at
-                }
-            })
+                    "agent": "Observer",
+                    "action": "Doğrulama Taraması",
+                    "status": verification_task.status.value,
+                    "timestamp": verification_task.created_at,
+                    "details": {
+                        "description": verification_task.description,
+                        "progress": f"{verification_task.progress_percentage}%",
+                        "completed_at": verification_task.completed_at
+                    }
+                })
 
                 # Observer Verification Reports (eğer step 1a'da eklenmediyse)
             verification_reports = db.query(ObserverReport).filter(
@@ -580,43 +580,43 @@ def build_story_timeline(db: Session, controller_task: ControllerTask) -> list:
                     )
                     
                     if not already_added_reports:
-                timeline.append({
+                        timeline.append({
                             "step": "7a",
-                    "agent": "Observer",
-                    "action": "Doğrulama Sonucu",
-                    "status": "COMPLETED",
-                    "timestamp": verification_task.completed_at or verification_task.created_at,
-                    "details": {
-                        "reports_count": len(verification_reports),
-                        "has_errors": any(r.severity.value in ["ERROR", "WARNING"] for r in verification_reports),
-                        "reports": [
-                            {
-                                "rule_name": r.rule_name,
-                                "severity": r.severity.value,
+                            "agent": "Observer",
+                            "action": "Doğrulama Sonucu",
+                            "status": "COMPLETED",
+                            "timestamp": verification_task.completed_at or verification_task.created_at,
+                            "details": {
+                                "reports_count": len(verification_reports),
+                                "has_errors": any(r.severity.value in ["ERROR", "WARNING"] for r in verification_reports),
+                                "reports": [
+                                    {
+                                        "rule_name": r.rule_name,
+                                        "severity": r.severity.value,
                                         "message": r.message,
                                         "details": r.details
+                                    }
+                                    for r in verification_reports
+                                ]
                             }
-                            for r in verification_reports
-                        ]
-                    }
-                })
+                        })
 
     # 8. Controller - Final Doğrulama
     if controller_task.verification_completed_at:
-    timeline.append({
+        timeline.append({
             "step": 8,
-        "agent": "Controller",
-        "action": "Final Doğrulama",
-        "status": controller_task.status.value,
+            "agent": "Controller",
+            "action": "Final Doğrulama",
+            "status": controller_task.status.value,
             "timestamp": controller_task.verification_completed_at,
-        "details": {
-            "is_verified": controller_task.is_verified,
-            "verification_notes": controller_task.verification_notes,
-            "retry_count": controller_task.retry_count,
+            "details": {
+                "is_verified": controller_task.is_verified,
+                "verification_notes": controller_task.verification_notes,
+                "retry_count": controller_task.retry_count,
                 "observer_report": controller_task.observer_report,
                 "observer_verification_time": controller_task.observer_verification_time
-        }
-    })
+            }
+        })
 
     # 9. Retry (varsa)
     if controller_task.retry_count > 0:
